@@ -1,0 +1,212 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../models/battery.dart';
+import '../models/drone.dart';
+import '../models/flight_plan.dart';
+import '../models/fly_score.dart';
+import '../models/kp_index.dart';
+import '../models/lesson.dart';
+import '../models/location_snapshot.dart';
+import '../models/map_zone.dart';
+import '../models/auth_user.dart';
+import '../models/user_profile.dart';
+import '../models/weather_snapshot.dart';
+import 'auth_service.dart';
+import 'fly_score_service.dart';
+import 'location_service.dart';
+import 'map_zone_service.dart';
+import 'mock_data.dart';
+import 'openai_service.dart';
+import 'user_data_service.dart';
+import 'weather_service.dart';
+
+final userDataServiceProvider = Provider<UserDataService>(
+  (ref) => FirestoreUserDataService(),
+);
+final authServiceProvider = Provider<AuthService>(
+  (ref) => FirebaseAuthService(ref.watch(userDataServiceProvider)),
+);
+final authStateProvider = StreamProvider<AuthUser?>(
+  (ref) => ref.watch(authServiceProvider).authStateChanges(),
+);
+final currentUserProvider = Provider<AuthUser?>((ref) {
+  final streamUser = ref.watch(authStateProvider).value;
+  return streamUser ?? ref.watch(authServiceProvider).currentUser;
+});
+final userProfileProvider = StreamProvider<UserProfile?>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return const Stream.empty();
+  return ref.watch(userDataServiceProvider).watchProfile(user.id);
+});
+
+extension SensitiveUserStateInvalidation on WidgetRef {
+  void invalidateSensitiveUserState() {
+    invalidate(userProfileProvider);
+    invalidate(dronesProvider);
+    invalidate(batteriesProvider);
+    invalidate(activeDroneProvider);
+    invalidate(activeBatteryProvider);
+    invalidate(flyScoreProvider);
+    invalidate(weatherProvider);
+    invalidate(locationProvider);
+    invalidate(mapZonesProvider);
+  }
+}
+
+final locationServiceProvider = Provider<LocationService>(
+  (ref) => GeolocatorLocationService(),
+);
+final weatherServiceProvider = Provider<WeatherService>(
+  (ref) => WeatherApiService(),
+);
+final kpIndexServiceProvider = Provider<KpIndexService>(
+  (ref) => MockKpIndexService(),
+);
+final droneServiceProvider = Provider<DroneService>(
+  (ref) => UserDroneService(ref),
+);
+final batteryServiceProvider = Provider<BatteryService>(
+  (ref) => UserBatteryService(ref),
+);
+final flightPlanServiceProvider = Provider<FlightPlanService>(
+  (ref) => MockFlightPlanService(),
+);
+final academyServiceProvider = Provider<AcademyService>(
+  (ref) => MockAcademyService(),
+);
+final openAIServiceProvider = Provider<OpenAIService>(
+  (ref) => OpenAIChatService(),
+);
+final mapZoneServiceProvider = Provider<MapZoneService>(
+  (ref) => MockMapZoneService(),
+);
+
+final locationProvider = FutureProvider<LocationSnapshot>(
+  (ref) => ref.watch(locationServiceProvider).current(),
+);
+final weatherProvider = FutureProvider<WeatherSnapshot>((ref) async {
+  final location = await ref.watch(locationProvider.future);
+  return ref.watch(weatherServiceProvider).current(location);
+});
+final kpProvider = FutureProvider<KpIndex>(
+  (ref) => ref.watch(kpIndexServiceProvider).current(),
+);
+final dronesProvider = FutureProvider<List<Drone>>(
+  (ref) => ref.watch(droneServiceProvider).all(),
+);
+final batteriesProvider = FutureProvider<List<DroneBattery>>(
+  (ref) => ref.watch(batteryServiceProvider).all(),
+);
+final activeDroneProvider = FutureProvider<Drone>((ref) async {
+  final drones = await ref.watch(dronesProvider.future);
+  final profile = ref.watch(userProfileProvider).value;
+  return drones.firstWhere(
+    (drone) => drone.id == profile?.activeDroneId,
+    orElse: () => drones.first,
+  );
+});
+final activeBatteryProvider = FutureProvider<DroneBattery>((ref) async {
+  final batteries = await ref.watch(batteriesProvider.future);
+  final profile = ref.watch(userProfileProvider).value;
+  return batteries.firstWhere(
+    (battery) => battery.id == profile?.activeBatteryId,
+    orElse: () => batteries.first,
+  );
+});
+final flightPlanProvider = FutureProvider<FlightPlan>(
+  (ref) => ref.watch(flightPlanServiceProvider).featured(),
+);
+final lessonsProvider = FutureProvider<List<Lesson>>(
+  (ref) => ref.watch(academyServiceProvider).featured(),
+);
+final mapZonesProvider = FutureProvider<List<MapZone>>((ref) async {
+  final location = await ref.watch(locationProvider.future);
+  return ref.watch(mapZoneServiceProvider).zonesNear(location);
+});
+
+final flyScoreProvider = FutureProvider<FlyScore>((ref) async {
+  final weather = await ref.watch(weatherProvider.future);
+  final kp = await ref.watch(kpProvider.future);
+  final location = await ref.watch(locationProvider.future);
+  final battery = await ref.watch(activeBatteryProvider.future);
+  final drone = await ref.watch(activeDroneProvider.future);
+  final isRestricted = await ref
+      .watch(mapZoneServiceProvider)
+      .isRestricted(location);
+  return FlyScoreService().calculate(
+    weather: weather,
+    kp: kp,
+    location: location,
+    batteryLevel: battery.level,
+    isRestrictedZone: isRestricted,
+    pilotLevel:
+        ref.watch(userProfileProvider).value?.pilotLevel ??
+        'Dato no disponible',
+    droneType: drone.type,
+  );
+});
+
+abstract class KpIndexService {
+  Future<KpIndex> current();
+}
+
+abstract class DroneService {
+  Future<List<Drone>> all();
+}
+
+abstract class BatteryService {
+  Future<List<DroneBattery>> all();
+}
+
+abstract class FlightPlanService {
+  Future<FlightPlan> featured();
+}
+
+abstract class AcademyService {
+  Future<List<Lesson>> featured();
+}
+
+class MockKpIndexService implements KpIndexService {
+  @override
+  Future<KpIndex> current() async => MockData.kp;
+}
+
+class UserDroneService implements DroneService {
+  UserDroneService(this.ref);
+
+  final Ref ref;
+
+  @override
+  Future<List<Drone>> all() async {
+    final user = ref.watch(currentUserProvider);
+    if (user == null) return MockData.drones;
+    final stream = ref.watch(userDataServiceProvider).watchDrones(user.id);
+    final drones = await stream.first;
+    return drones.isEmpty ? MockData.drones : drones;
+  }
+}
+
+class UserBatteryService implements BatteryService {
+  UserBatteryService(this.ref);
+
+  final Ref ref;
+
+  @override
+  Future<List<DroneBattery>> all() async {
+    final user = ref.watch(currentUserProvider);
+    if (user == null) return MockData.batteries;
+    final stream = ref.watch(userDataServiceProvider).watchBatteries(user.id);
+    final batteries = await stream.first;
+    return batteries.isEmpty ? MockData.batteries : batteries;
+  }
+}
+
+class MockFlightPlanService implements FlightPlanService {
+  @override
+  Future<FlightPlan> featured() async => MockData.plan;
+}
+
+class MockAcademyService implements AcademyService {
+  @override
+  Future<List<Lesson>> featured() async => MockData.lessons;
+}
