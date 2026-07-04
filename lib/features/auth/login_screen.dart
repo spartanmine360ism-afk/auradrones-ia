@@ -37,19 +37,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       final auth = ref.read(authServiceProvider);
       if (_register) {
-        await auth.register(
+        final user = await auth.register(
           name: _name.text.trim().isEmpty ? 'Piloto' : _name.text.trim(),
           email: _email.text.trim(),
           password: _password.text,
         );
-        if (mounted) context.go('/onboarding');
+        await ref.read(userDataServiceProvider).ensureUserProfile(user);
+        if (mounted) context.go('/verify-email');
       } else {
-        await auth.signIn(email: _email.text.trim(), password: _password.text);
-        final profile = await ref.read(userProfileProvider.future);
+        final user = await auth.signIn(
+          email: _email.text.trim(),
+          password: _password.text,
+        );
         if (mounted) {
-          context.go(
-            profile?.onboardingComplete == true ? '/home' : '/onboarding',
-          );
+          if (!user.emailVerified) {
+            context.go('/verify-email');
+            return;
+          }
+          final profile = await ref
+              .read(userDataServiceProvider)
+              .ensureUserProfile(user);
+          if (!mounted) return;
+          context.go(profile.onboardingComplete ? '/home' : '/onboarding');
         }
       }
     } catch (error) {
@@ -60,11 +69,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _resetPassword() async {
-    await ref.read(authServiceProvider).sendPasswordReset(_email.text.trim());
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Correo de recuperacion enviado')),
-      );
+    final email = _email.text.trim();
+    if (email.isEmpty) {
+      setState(() => _error = 'Escribe tu email para recuperar password');
+      return;
+    }
+    try {
+      await ref.read(authServiceProvider).sendPasswordReset(email);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Te enviamos un correo para cambiar tu contrasena'),
+          ),
+        );
+      }
+    } catch (error) {
+      setState(() => _error = '$error');
     }
   }
 
@@ -128,7 +148,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     TextButton(
                       onPressed: _loading ? null : _resetPassword,
-                      child: const Text('Recuperar password'),
+                      child: const Text('Olvide mi contrasena'),
                     ),
                   ],
                 ),

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/battery.dart';
 import '../models/drone.dart';
+import '../models/flight_log.dart';
 import '../models/flight_plan.dart';
 import '../models/fly_score.dart';
 import '../models/kp_index.dart';
@@ -17,6 +18,7 @@ import 'location_service.dart';
 import 'map_zone_service.dart';
 import 'mock_data.dart';
 import 'openai_service.dart';
+import 'kp_index_service.dart';
 import 'user_data_service.dart';
 import 'weather_service.dart';
 
@@ -60,7 +62,7 @@ final weatherServiceProvider = Provider<WeatherService>(
   (ref) => WeatherApiService(),
 );
 final kpIndexServiceProvider = Provider<KpIndexService>(
-  (ref) => MockKpIndexService(),
+  (ref) => NoaaKpIndexService(),
 );
 final droneServiceProvider = Provider<DroneService>(
   (ref) => UserDroneService(ref),
@@ -97,8 +99,16 @@ final dronesProvider = FutureProvider<List<Drone>>(
 final batteriesProvider = FutureProvider<List<DroneBattery>>(
   (ref) => ref.watch(batteryServiceProvider).all(),
 );
+final flightLogsProvider = StreamProvider<List<FlightLog>>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return const Stream.empty();
+  return ref.watch(userDataServiceProvider).watchFlights(user.id);
+});
 final activeDroneProvider = FutureProvider<Drone>((ref) async {
   final drones = await ref.watch(dronesProvider.future);
+  if (drones.isEmpty) {
+    throw StateError('Agrega un dron para calcular Fly Score.');
+  }
   final profile = ref.watch(userProfileProvider).value;
   return drones.firstWhere(
     (drone) => drone.id == profile?.activeDroneId,
@@ -107,6 +117,9 @@ final activeDroneProvider = FutureProvider<Drone>((ref) async {
 });
 final activeBatteryProvider = FutureProvider<DroneBattery>((ref) async {
   final batteries = await ref.watch(batteriesProvider.future);
+  if (batteries.isEmpty) {
+    throw StateError('Agrega una bateria para calcular Fly Score.');
+  }
   final profile = ref.watch(userProfileProvider).value;
   return batteries.firstWhere(
     (battery) => battery.id == profile?.activeBatteryId,
@@ -146,10 +159,6 @@ final flyScoreProvider = FutureProvider<FlyScore>((ref) async {
   );
 });
 
-abstract class KpIndexService {
-  Future<KpIndex> current();
-}
-
 abstract class DroneService {
   Future<List<Drone>> all();
 }
@@ -166,11 +175,6 @@ abstract class AcademyService {
   Future<List<Lesson>> featured();
 }
 
-class MockKpIndexService implements KpIndexService {
-  @override
-  Future<KpIndex> current() async => MockData.kp;
-}
-
 class UserDroneService implements DroneService {
   UserDroneService(this.ref);
 
@@ -181,8 +185,7 @@ class UserDroneService implements DroneService {
     final user = ref.watch(currentUserProvider);
     if (user == null) return MockData.drones;
     final stream = ref.watch(userDataServiceProvider).watchDrones(user.id);
-    final drones = await stream.first;
-    return drones.isEmpty ? MockData.drones : drones;
+    return stream.first;
   }
 }
 
@@ -196,8 +199,7 @@ class UserBatteryService implements BatteryService {
     final user = ref.watch(currentUserProvider);
     if (user == null) return MockData.batteries;
     final stream = ref.watch(userDataServiceProvider).watchBatteries(user.id);
-    final batteries = await stream.first;
-    return batteries.isEmpty ? MockData.batteries : batteries;
+    return stream.first;
   }
 }
 

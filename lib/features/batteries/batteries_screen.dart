@@ -19,45 +19,55 @@ class BatteriesScreen extends ConsumerWidget {
       body: AuraBackground(
         child: SafeArea(
           child: batteries.when(
-            data: (items) => ListView.separated(
-              padding: const EdgeInsets.all(12),
-              itemCount: items.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                final battery = items[index];
-                final active = battery.id == profile?.activeBatteryId;
-                final color = battery.level < 30 || battery.cycles > 100
-                    ? AuraColors.amber
-                    : AuraColors.mint;
-                return AuraGlassCard(
-                  padding: const EdgeInsets.all(12),
-                  child: ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(
-                      active ? Icons.check_circle : Icons.battery_charging_full,
-                      color: color,
+            data: (items) {
+              if (items.isEmpty) {
+                return const Center(child: Text('Agrega tu primera bateria.'));
+              }
+              return ListView.separated(
+                padding: const EdgeInsets.all(12),
+                itemCount: items.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  final battery = items[index];
+                  final active = battery.id == profile?.activeBatteryId;
+                  final color = battery.level < 30 || battery.cycles > 100
+                      ? AuraColors.amber
+                      : AuraColors.mint;
+                  return AuraGlassCard(
+                    padding: const EdgeInsets.all(12),
+                    child: ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        active
+                            ? Icons.check_circle
+                            : Icons.battery_charging_full,
+                        color: color,
+                      ),
+                      title: Text(battery.name),
+                      subtitle: Text(
+                        '${battery.compatibleModel} - ${battery.cycles} ciclos - salud ${battery.health}%',
+                      ),
+                      trailing: PopupMenuButton<String>(
+                        onSelected: (value) =>
+                            _handleAction(context, ref, value, battery),
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(
+                            value: 'active',
+                            child: Text('Elegir activa'),
+                          ),
+                          PopupMenuItem(value: 'edit', child: Text('Editar')),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Text('Eliminar'),
+                          ),
+                        ],
+                      ),
                     ),
-                    title: Text(battery.name),
-                    subtitle: Text(
-                      '${battery.compatibleModel} - ${battery.cycles} ciclos - salud ${battery.health}%',
-                    ),
-                    trailing: PopupMenuButton<String>(
-                      onSelected: (value) =>
-                          _handleAction(context, ref, value, battery),
-                      itemBuilder: (_) => const [
-                        PopupMenuItem(
-                          value: 'active',
-                          child: Text('Elegir activa'),
-                        ),
-                        PopupMenuItem(value: 'edit', child: Text('Editar')),
-                        PopupMenuItem(value: 'delete', child: Text('Eliminar')),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+                  );
+                },
+              );
+            },
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (error, _) => Center(child: Text('Error: $error')),
           ),
@@ -194,6 +204,8 @@ class BatteriesScreen extends ConsumerWidget {
                           level: int.tryParse(level.text) ?? 100,
                           status: status,
                           notes: notes.text.trim(),
+                          createdAt: battery?.createdAt ?? DateTime.now(),
+                          updatedAt: DateTime.now(),
                         ),
                       );
                   ref.invalidate(batteriesProvider);

@@ -18,7 +18,10 @@ abstract class UserDataService {
   Stream<List<DroneBattery>> watchBatteries(String userId);
   Future<void> saveBattery(String userId, DroneBattery battery);
   Future<void> deleteBattery(String userId, String batteryId);
+  Stream<List<FlightLog>> watchFlights(String userId);
   Future<void> saveFlight(String userId, FlightLog flight);
+  Future<Map<String, bool>> loadPreflightChecklist(String userId);
+  Future<void> savePreflightChecklist(String userId, Map<String, bool> values);
   Future<void> addFlightHours(String userId, double hours);
   Future<void> setActiveDrone(String userId, String? droneId);
   Future<void> setActiveBattery(String userId, String? batteryId);
@@ -32,7 +35,9 @@ UserProfile defaultProfileFor(AuthUser user) {
     pilotLevel: 'Principiante',
     mainGoal: 'Hobby',
     createdAt: DateTime.now(),
+    updatedAt: DateTime.now(),
     totalFlightHours: 0,
+    emailVerified: user.emailVerified,
     activeDroneId: null,
     activeBatteryId: null,
     notifications: const {
@@ -70,7 +75,19 @@ class FirestoreUserDataService implements UserDataService {
     final ref = _users.doc(user.id);
     final doc = await ref.get();
     if (doc.exists && doc.data() != null) {
-      return UserProfile.fromMap(doc.id, doc.data()!);
+      final profile = UserProfile.fromMap(doc.id, doc.data()!);
+      if (profile.email != user.email ||
+          profile.name != user.name ||
+          profile.emailVerified != user.emailVerified) {
+        final updated = profile.copyWith(
+          name: user.name,
+          email: user.email,
+          emailVerified: user.emailVerified,
+        );
+        await ref.set(updated.toMap(), SetOptions(merge: true));
+        return updated;
+      }
+      return profile;
     }
     final profile = defaultProfileFor(user);
     await ref.set(profile.toMap());
@@ -109,7 +126,10 @@ class FirestoreUserDataService implements UserDataService {
     final ref = drone.id.isEmpty
         ? _users.doc(userId).collection('drones').doc()
         : _users.doc(userId).collection('drones').doc(drone.id);
-    await ref.set(drone.copyWith(id: ref.id).toMap(), SetOptions(merge: true));
+    await ref.set(
+      drone.copyWith(id: ref.id, updatedAt: DateTime.now()).toMap(),
+      SetOptions(merge: true),
+    );
   }
 
   @override
@@ -145,7 +165,7 @@ class FirestoreUserDataService implements UserDataService {
         ? _users.doc(userId).collection('batteries').doc()
         : _users.doc(userId).collection('batteries').doc(battery.id);
     await ref.set(
-      battery.copyWith(id: ref.id).toMap(),
+      battery.copyWith(id: ref.id, updatedAt: DateTime.now()).toMap(),
       SetOptions(merge: true),
     );
   }
@@ -156,6 +176,20 @@ class FirestoreUserDataService implements UserDataService {
       return DevUserDataService.instance.deleteBattery(userId, batteryId);
     }
     await _users.doc(userId).collection('batteries').doc(batteryId).delete();
+  }
+
+  @override
+  Stream<List<FlightLog>> watchFlights(String userId) {
+    if (!FirebaseBootstrap.initialized) {
+      return DevUserDataService.instance.watchFlights(userId);
+    }
+    return _users.doc(userId).collection('flights').snapshots().map((snapshot) {
+      final flights = snapshot.docs
+          .map((doc) => FlightLog.fromMap(doc.id, doc.data()))
+          .toList();
+      flights.sort((a, b) => b.date.compareTo(a.date));
+      return flights;
+    });
   }
 
   @override
@@ -170,9 +204,37 @@ class FirestoreUserDataService implements UserDataService {
   }
 
   @override
+  Future<Map<String, bool>> loadPreflightChecklist(String userId) async {
+    if (!FirebaseBootstrap.initialized) {
+      return DevUserDataService.instance.loadPreflightChecklist(userId);
+    }
+    final doc = await _users
+        .doc(userId)
+        .collection('flightState')
+        .doc('preflight')
+        .get();
+    final data = doc.data()?['items'] as Map<String, dynamic>?;
+    return data?.map((key, value) => MapEntry(key, value == true)) ?? {};
+  }
+
+  @override
+  Future<void> savePreflightChecklist(
+    String userId,
+    Map<String, bool> values,
+  ) async {
+    if (!FirebaseBootstrap.initialized) {
+      return DevUserDataService.instance.savePreflightChecklist(userId, values);
+    }
+    await _users.doc(userId).collection('flightState').doc('preflight').set({
+      'items': values,
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  @override
   Future<void> addFlightHours(String userId, double hours) async {
     final profile = await ensureUserProfile(
-      AuthUser(id: userId, email: '', name: ''),
+      AuthUser(id: userId, email: '', name: '', emailVerified: true),
     );
     await saveProfile(
       profile.copyWith(totalFlightHours: profile.totalFlightHours + hours),
@@ -182,7 +244,7 @@ class FirestoreUserDataService implements UserDataService {
   @override
   Future<void> setActiveDrone(String userId, String? droneId) async {
     final profile = await ensureUserProfile(
-      AuthUser(id: userId, email: '', name: ''),
+      AuthUser(id: userId, email: '', name: '', emailVerified: true),
     );
     await saveProfile(profile.copyWith(activeDroneId: droneId));
   }
@@ -190,7 +252,7 @@ class FirestoreUserDataService implements UserDataService {
   @override
   Future<void> setActiveBattery(String userId, String? batteryId) async {
     final profile = await ensureUserProfile(
-      AuthUser(id: userId, email: '', name: ''),
+      AuthUser(id: userId, email: '', name: '', emailVerified: true),
     );
     await saveProfile(profile.copyWith(activeBatteryId: batteryId));
   }
@@ -203,6 +265,8 @@ class DevUserDataService implements UserDataService {
   UserProfile? _profile;
   final _drones = [...MockData.drones];
   final _batteries = [...MockData.batteries];
+  final _flights = <FlightLog>[];
+  Map<String, bool> _preflightChecklist = {};
 
   @override
   Stream<UserProfile?> watchProfile(String userId) async* {
@@ -258,7 +322,53 @@ class DevUserDataService implements UserDataService {
   }
 
   @override
-  Future<void> saveFlight(String userId, FlightLog flight) async {}
+  Stream<List<FlightLog>> watchFlights(String userId) async* {
+    yield [..._flights]..sort((a, b) => b.date.compareTo(a.date));
+  }
+
+  @override
+  Future<void> saveFlight(String userId, FlightLog flight) async {
+    final id = flight.id.isEmpty
+        ? DateTime.now().microsecondsSinceEpoch.toString()
+        : flight.id;
+    _flights.removeWhere((item) => item.id == id);
+    _flights.add(
+      FlightLog(
+        id: id,
+        date: flight.date,
+        location: flight.location,
+        coordinates: flight.coordinates,
+        droneId: flight.droneId,
+        batteryId: flight.batteryId,
+        durationMinutes: flight.durationMinutes,
+        flightType: flight.flightType,
+        weather: flight.weather,
+        kp: flight.kp,
+        flyScore: flight.flyScore,
+        notes: flight.notes,
+        problems: flight.problems,
+        learnings: flight.learnings,
+        mediaUrls: flight.mediaUrls,
+        checklist: flight.checklist,
+        shotlist: flight.shotlist,
+        createdAt: flight.createdAt,
+        updatedAt: flight.updatedAt,
+      ),
+    );
+  }
+
+  @override
+  Future<Map<String, bool>> loadPreflightChecklist(String userId) async {
+    return _preflightChecklist;
+  }
+
+  @override
+  Future<void> savePreflightChecklist(
+    String userId,
+    Map<String, bool> values,
+  ) async {
+    _preflightChecklist = values;
+  }
 
   @override
   Future<void> addFlightHours(String userId, double hours) async {

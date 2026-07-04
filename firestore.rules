@@ -24,6 +24,10 @@ service cloud.firestore {
       match /flights/{flightId} {
         allow read, create, update, delete: if owns(userId);
       }
+
+      match /flightState/{stateId} {
+        allow read, create, update, delete: if owns(userId);
+      }
     }
 
     match /{document=**} {

@@ -2,11 +2,10 @@ class AppConstants {
   const AppConstants._();
 
   static const appName = 'Aura Drones IA';
-  static const pilotName = 'Aldo';
   static const openAiApiKey = String.fromEnvironment('OPENAI_API_KEY');
   static const openAiModel = String.fromEnvironment(
     'OPENAI_MODEL',
-    defaultValue: 'gpt-5.5',
+    defaultValue: 'gpt-4o-mini',
   );
   static const weatherApiKey = String.fromEnvironment('WEATHER_API_KEY');
   static const googleMapsApiKey = String.fromEnvironment('GOOGLE_MAPS_API_KEY');

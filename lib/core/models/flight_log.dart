@@ -15,6 +15,10 @@ class FlightLog {
     required this.problems,
     required this.learnings,
     required this.mediaUrls,
+    required this.checklist,
+    required this.shotlist,
+    required this.createdAt,
+    required this.updatedAt,
   });
 
   final String id;
@@ -32,23 +36,77 @@ class FlightLog {
   final String problems;
   final String learnings;
   final List<String> mediaUrls;
+  final Map<String, bool> checklist;
+  final List<String> shotlist;
+  final DateTime createdAt;
+  final DateTime updatedAt;
 
   Map<String, dynamic> toMap() {
     return {
-      'fecha': date.toIso8601String(),
-      'ubicacion': location,
-      'coordenadas': coordinates,
-      'dronUsado': droneId,
-      'bateriaUsada': batteryId,
-      'duracion': durationMinutes,
-      'tipoVuelo': flightType,
-      'clima': weather,
+      'date': date.toIso8601String(),
+      'locationName': location,
+      'coordinates': coordinates,
+      'droneId': droneId,
+      'batteryId': batteryId,
+      'durationMinutes': durationMinutes,
+      'flightType': flightType,
+      'weather': weather,
       'kp': kp,
       'flyScore': flyScore,
-      'notas': notes,
-      'problemas': problems,
-      'aprendizajes': learnings,
-      'fotosVideos': mediaUrls,
+      'notes': notes,
+      'problems': problems,
+      'learnings': learnings,
+      'mediaUrls': mediaUrls,
+      'checklist': checklist,
+      'shotlist': shotlist,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
     };
+  }
+
+  factory FlightLog.fromMap(String id, Map<String, dynamic> map) {
+    return FlightLog(
+      id: id,
+      date:
+          DateTime.tryParse(
+            map['date'] as String? ?? map['fecha'] as String? ?? '',
+          ) ??
+          DateTime.now(),
+      location:
+          map['locationName'] as String? ?? map['ubicacion'] as String? ?? '',
+      coordinates:
+          map['coordinates'] as String? ?? map['coordenadas'] as String? ?? '',
+      droneId: map['droneId'] as String? ?? map['dronUsado'] as String? ?? '',
+      batteryId:
+          map['batteryId'] as String? ?? map['bateriaUsada'] as String? ?? '',
+      durationMinutes:
+          ((map['durationMinutes'] as num?) ?? (map['duracion'] as num?) ?? 0)
+              .round(),
+      flightType:
+          map['flightType'] as String? ?? map['tipoVuelo'] as String? ?? '',
+      weather: map['weather'] as String? ?? map['clima'] as String? ?? '',
+      kp: ((map['kp'] as num?) ?? 0).toDouble(),
+      flyScore: ((map['flyScore'] as num?) ?? 0).round(),
+      notes: map['notes'] as String? ?? map['notas'] as String? ?? '',
+      problems: map['problems'] as String? ?? map['problemas'] as String? ?? '',
+      learnings:
+          map['learnings'] as String? ?? map['aprendizajes'] as String? ?? '',
+      mediaUrls:
+          ((map['mediaUrls'] ?? map['fotosVideos']) as List<dynamic>? ?? [])
+              .map((item) => '$item')
+              .toList(),
+      checklist: ((map['checklist'] as Map<String, dynamic>?) ?? {}).map(
+        (key, value) => MapEntry(key, value == true),
+      ),
+      shotlist: (map['shotlist'] as List<dynamic>? ?? [])
+          .map((item) => '$item')
+          .toList(),
+      createdAt:
+          DateTime.tryParse(map['createdAt'] as String? ?? '') ??
+          DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(map['updatedAt'] as String? ?? '') ??
+          DateTime.now(),
+    );
   }
 }

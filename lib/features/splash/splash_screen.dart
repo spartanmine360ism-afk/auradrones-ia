@@ -28,9 +28,18 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       context.go('/login');
       return;
     }
+    if (!user.emailVerified) {
+      context.go('/verify-email');
+      return;
+    }
     final profile = await ref
         .read(userDataServiceProvider)
         .ensureUserProfile(user);
+    if (profile.emailVerified != user.emailVerified) {
+      await ref
+          .read(userDataServiceProvider)
+          .saveProfile(profile.copyWith(emailVerified: user.emailVerified));
+    }
     if (!mounted) return;
     context.go(profile.onboardingComplete ? '/home' : '/onboarding');
   }

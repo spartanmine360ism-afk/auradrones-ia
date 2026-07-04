@@ -77,17 +77,19 @@ class OpenAIChatService implements OpenAIService {
     final context =
         '''
 Mensaje exacto del usuario: $message
-Ubicacion: ${location.city} (${location.coordinates}), precision ${location.accuracyMeters.round()} m.
+Ubicación: ${location.city} (${location.coordinates}), precisión ${location.accuracyMeters.round()} m.
 Clima: ${weather.temperatureC.round()} C, viento ${weather.windKmh.round()} km/h, rachas ${weather.gustKmh.round()} km/h, lluvia ${weather.rainChance}%, visibilidad ${weather.visibilityKm} km, nubes ${weather.cloudCover}%.
 KP: ${kp.value} (${kp.risk}).
-Fly Score: ${flyScore.value}, estado ${flyScore.status}. Recomendacion: ${flyScore.recommendation}.
+Fly Score: ${flyScore.value}, estado ${flyScore.status}. Recomendación: ${flyScore.recommendation}.
 Dron activo: ${drone.brand} ${drone.model}, tipo ${drone.type}, ${drone.weightGrams} g.
 Drones del usuario: ${drones.map((item) => '${item.brand} ${item.model}').join(', ')}.
-Bateria activa: ${battery.name}, nivel ${battery.level}%, salud ${battery.health}%, ciclos ${battery.cycles}.
+Batería activa: ${battery.name}, nivel ${battery.level}%, salud ${battery.health}%, ciclos ${battery.cycles}.
 Nivel del piloto: $pilotLevel. Horas totales de vuelo: ${totalFlightHours.toStringAsFixed(1)}.
 ''';
+
     final conversation = history
         .where((item) => item.text.trim().isNotEmpty)
+        .take(8)
         .map((item) => '${item.isUser ? 'user' : 'assistant'}: ${item.text}')
         .join('\n');
 
@@ -102,10 +104,9 @@ Nivel del piloto: $pilotLevel. Horas totales de vuelo: ${totalFlightHours.toStri
             body: jsonEncode({
               'model': AppConstants.openAiModel,
               'instructions':
-                  'Eres Aura IA, un copiloto inteligente para pilotos de drones. Responde especificamente al mensaje exacto del usuario, sin repetir respuestas anteriores. Usa contexto real de clima, ubicacion, KP, Fly Score, dron activo, bateria y nivel del piloto. Limita la respuesta a 4-6 lineas cortas para movil. Si pregunta "hola", saluda corto. Si pregunta si puede volar hoy, analiza clima y Fly Score. Si pregunta que ND usar, recomienda filtro segun luz/hora. Si pide tomas, crea shotlist. Si pregunta riesgos, explica riesgos. Nunca recomiendes volar si las condiciones son peligrosas o ilegales.',
+                  'Eres Aura IA, un copiloto inteligente para pilotos de drones. Responde específicamente al mensaje exacto del usuario, sin repetir respuestas anteriores. Usa contexto real de clima, ubicación, KP, Fly Score, dron activo, batería y nivel del piloto. Limita la respuesta a 4-6 líneas cortas para móvil. Si pregunta "hola", saluda corto. Si pregunta si puede volar hoy, analiza clima y Fly Score. Si pregunta qué ND usar, recomienda filtro según luz/hora. Si pide tomas, crea shotlist. Si pregunta riesgos, explica riesgos. Nunca recomiendes volar si las condiciones son peligrosas o ilegales.',
               'input':
                   '$context\nHistorial reciente:\n$conversation\n\nResponde ahora al usuario: $message',
-              'temperature': 0.45,
               'max_output_tokens': 260,
             }),
           )
@@ -116,11 +117,13 @@ Nivel del piloto: $pilotLevel. Horas totales de vuelo: ${totalFlightHours.toStri
           'OpenAI ${response.statusCode}: ${response.body}',
         );
       }
+
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       final answer = json['output_text'] as String? ?? _extractOutputText(json);
+
       return answer?.trim().isNotEmpty == true
           ? answer!.trim()
-          : 'No recibi una respuesta util. Revisa tu conexion e intenta de nuevo.';
+          : 'No recibí una respuesta útil. Revisa tu conexión e intenta de nuevo.';
     } on OpenAIServiceException {
       rethrow;
     } catch (error) {
@@ -131,17 +134,21 @@ Nivel del piloto: $pilotLevel. Horas totales de vuelo: ${totalFlightHours.toStri
   String? _extractOutputText(Map<String, dynamic> json) {
     final output = json['output'] as List<dynamic>? ?? [];
     final chunks = <String>[];
+
     for (final item in output) {
       final content =
           (item as Map<String, dynamic>)['content'] as List<dynamic>? ?? [];
+
       for (final contentItem in content) {
         final contentMap = contentItem as Map<String, dynamic>;
         final text = contentMap['text'] as String?;
+
         if (text != null && text.trim().isNotEmpty) {
           chunks.add(text.trim());
         }
       }
     }
+
     return chunks.isEmpty ? null : chunks.join('\n');
   }
 }
@@ -162,27 +169,34 @@ class MockOpenAIService implements OpenAIService {
     required double totalFlightHours,
   }) async {
     final text = message.toLowerCase();
-    final prefix = 'Modo demo IA\n';
+    const prefix = 'Modo demo IA\n';
+
     if (text.contains('hola') || text == 'buenas') {
-      return '${prefix}Hola, Aldo. Listo para revisar tu vuelo.\nPreguntame clima, riesgos, ND o tomas.';
+      return '${prefix}Hola, piloto. Listo para revisar tu vuelo.\nPregúntame clima, riesgos, ND o tomas.';
     }
+
     if (text.contains('puedo volar') || text.contains('volar hoy')) {
-      return '${prefix}Fly Score ${flyScore.value}: ${flyScore.status}.\nViento ${weather.windKmh.round()} km/h, rachas ${weather.gustKmh.round()} km/h.\nKP ${kp.value} y bateria ${battery.level}%.\n${flyScore.recommendation}';
+      return '${prefix}Fly Score ${flyScore.value}: ${flyScore.status}.\nViento ${weather.windKmh.round()} km/h, rachas ${weather.gustKmh.round()} km/h.\nKP ${kp.value} y batería ${battery.level}%.\n${flyScore.recommendation}';
     }
+
     if (text.contains('nd') || text.contains('filtro')) {
-      return '${prefix}Para ${location.city}, empieza con ND16 si hay sol fuerte.\nSi estas cerca de atardecer, prueba ND8.\nMantén ISO 100 y shutter 1/120 en 60fps.\nAjusta si el histograma se va a altas luces.';
+      return '${prefix}Para ${location.city}, empieza con ND16 si hay sol fuerte.\nSi estás cerca de atardecer, prueba ND8.\nMantén ISO 100 y shutter 1/120 en 60fps.';
     }
+
     if (text.contains('tomas') ||
         text.contains('shot') ||
         text.contains('shotlist')) {
-      return '${prefix}Shotlist rapido:\n- Reveal bajo y lento.\n- Orbit amplio del sujeto.\n- Top down para contexto.\n- Dolly out para cierre.';
+      return '${prefix}Shotlist rápido:\n- Reveal bajo y lento.\n- Orbit amplio del sujeto.\n- Top down para contexto.\n- Dolly out para cierre.';
     }
+
     if (text.contains('riesgo') || text.contains('peligro')) {
       final alerts = flyScore.negativeFactors.isEmpty
-          ? 'Sin alertas criticas detectadas.'
+          ? 'Sin alertas críticas detectadas.'
           : flyScore.negativeFactors.take(3).join('\n- ');
-      return '${prefix}Riesgos principales:\n- $alerts\nRevisa zona, personas y regreso con bateria.';
+
+      return '${prefix}Riesgos principales:\n- $alerts\nRevisa zona, personas y regreso con batería.';
     }
-    return '${prefix}Entiendo: "$message".\nCon Fly Score ${flyScore.value}, viento ${weather.windKmh.round()} km/h y bateria ${battery.level}%, mi consejo es volar conservador.\nPuedo afinar clima, ND, riesgos o tomas.';
+
+    return '${prefix}Entiendo: "$message".\nCon Fly Score ${flyScore.value}, viento ${weather.windKmh.round()} km/h y batería ${battery.level}%, mi consejo es volar conservador.\nPuedo afinar clima, ND, riesgos o tomas.';
   }
 }

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/constants/app_constants.dart';
 import '../../core/models/fly_score.dart';
 import '../../core/services/providers.dart';
 import '../../core/theme/aura_theme.dart';
@@ -10,6 +9,7 @@ import '../../core/widgets/aura_background.dart';
 import '../../core/widgets/aura_glass_card.dart';
 import '../../core/widgets/aura_status_badge.dart';
 import '../shared/section_title.dart';
+import '../shared/aura_community_card.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -21,6 +21,8 @@ class HomeScreen extends ConsumerWidget {
     final kp = ref.watch(kpProvider);
     final location = ref.watch(locationProvider);
     final battery = ref.watch(activeBatteryProvider);
+    final drone = ref.watch(activeDroneProvider);
+    final profile = ref.watch(userProfileProvider);
     final width = MediaQuery.sizeOf(context).width;
     final padding = width <= 430 ? 12.0 : 18.0;
 
@@ -30,9 +32,13 @@ class HomeScreen extends ConsumerWidget {
           child: ListView(
             padding: EdgeInsets.fromLTRB(padding, 10, padding, 22),
             children: [
-              Text(
-                'Hola, ${AppConstants.pilotName} - Aura Pilot',
-                style: Theme.of(context).textTheme.titleSmall,
+              profile.when(
+                data: (value) => Text(
+                  'Hola, ${value?.name.isNotEmpty == true ? value!.name : 'Piloto'}',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                loading: () => const LinearProgressIndicator(),
+                error: (error, _) => Text('Hola, Piloto\n$error'),
               ),
               const SizedBox(height: 10),
               score.when(
@@ -96,6 +102,25 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 10),
+              drone.when(
+                data: (value) => _CompactMetricCard(
+                  icon: Icons.flight,
+                  title: 'Dron activo',
+                  value: '${value.brand} ${value.model}',
+                  details: [
+                    '${value.weightGrams} g',
+                    '${value.flightHours.toStringAsFixed(1)} h',
+                  ],
+                ),
+                loading: () => const SizedBox.shrink(),
+                error: (error, _) => _CompactMetricCard(
+                  icon: Icons.flight,
+                  title: 'Dron activo',
+                  value: 'Agrega tu dron',
+                  details: ['$error'],
+                ),
+              ),
+              const SizedBox(height: 10),
               location.when(
                 data: (value) => _CompactMetricCard(
                   icon: Icons.my_location,
@@ -146,6 +171,8 @@ class HomeScreen extends ConsumerWidget {
                   _QuickAction('Planear', Icons.route_outlined, '/planner'),
                 ].map((item) => _QuickActionButton(item: item)).toList(),
               ),
+              const SizedBox(height: 16),
+              const AuraCommunityCard(),
             ],
           ),
         ),

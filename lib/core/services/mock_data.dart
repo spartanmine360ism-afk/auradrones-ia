@@ -52,6 +52,7 @@ class MockData {
       notes: '',
       photoUrl: null,
       createdAt: DateTime(2026),
+      updatedAt: DateTime(2026),
     ),
     Drone(
       id: 'air3',
@@ -68,10 +69,11 @@ class MockData {
       notes: '',
       photoUrl: null,
       createdAt: DateTime(2026),
+      updatedAt: DateTime(2026),
     ),
   ];
 
-  static const batteries = [
+  static final batteries = [
     DroneBattery(
       id: 'b1',
       name: 'Bateria 1',
@@ -84,6 +86,8 @@ class MockData {
       level: 92,
       status: 'Buena',
       notes: '',
+      createdAt: DateTime(2026),
+      updatedAt: DateTime(2026),
     ),
     DroneBattery(
       id: 'b2',
@@ -97,6 +101,8 @@ class MockData {
       level: 28,
       status: 'Revisar',
       notes: '',
+      createdAt: DateTime(2026),
+      updatedAt: DateTime(2026),
     ),
   ];
 
@@ -163,6 +169,34 @@ class MockData {
       level: 'Intermedio',
       minutes: 9,
       description: 'Control de shutter, exposicion y motion blur natural.',
+    ),
+    Lesson(
+      title: 'Composicion para revelar ubicaciones',
+      category: 'Composicion',
+      level: 'Principiante',
+      minutes: 7,
+      description: 'Encuadres simples para mostrar sujeto, escala y contexto.',
+    ),
+    Lesson(
+      title: 'Edicion rapida para redes',
+      category: 'Edicion',
+      level: 'Intermedio',
+      minutes: 11,
+      description: 'Seleccion, ritmo y color para publicar sin perder calidad.',
+    ),
+    Lesson(
+      title: 'Normativa basica antes de volar',
+      category: 'Normativa',
+      level: 'Principiante',
+      minutes: 8,
+      description: 'Permisos, zonas sensibles y responsabilidad del piloto.',
+    ),
+    Lesson(
+      title: 'Mantenimiento preventivo',
+      category: 'Mantenimiento',
+      level: 'Principiante',
+      minutes: 9,
+      description: 'Revision de helices, baterias, sensores y limpieza.',
     ),
   ];
 }

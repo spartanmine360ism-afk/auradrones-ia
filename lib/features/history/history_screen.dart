@@ -19,6 +19,7 @@ class HistoryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(userProfileProvider).value;
+    final flights = ref.watch(flightLogsProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Historial de vuelos')),
       body: AuraBackground(
@@ -66,6 +67,36 @@ class HistoryScreen extends ConsumerWidget {
                   ),
                   onTap: () => _showFlightForm(context, ref),
                 ),
+              ),
+              const SizedBox(height: 12),
+              flights.when(
+                data: (items) {
+                  if (items.isEmpty) {
+                    return const AuraGlassCard(
+                      child: Text('Aun no hay vuelos guardados.'),
+                    );
+                  }
+                  return Column(
+                    children: [
+                      for (final flight in items) ...[
+                        AuraGlassCard(
+                          child: ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.flight_takeoff),
+                            title: Text(flight.location),
+                            subtitle: Text(
+                              '${flight.flightType} - ${flight.durationMinutes} min\n${flight.weather}',
+                            ),
+                            trailing: Text('FS ${flight.flyScore}'),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                    ],
+                  );
+                },
+                loading: () => const LinearProgressIndicator(),
+                error: (error, _) => AuraGlassCard(child: Text('$error')),
               ),
             ],
           ),
@@ -170,6 +201,10 @@ class HistoryScreen extends ConsumerWidget {
                           problems: problems.text.trim(),
                           learnings: learnings.text.trim(),
                           mediaUrls: const [],
+                          checklist: const {},
+                          shotlist: const [],
+                          createdAt: DateTime.now(),
+                          updatedAt: DateTime.now(),
                         ),
                       );
                   await ref
@@ -179,6 +214,7 @@ class HistoryScreen extends ConsumerWidget {
                         (int.tryParse(duration.text) ?? 0) / 60,
                       );
                   ref.invalidate(userProfileProvider);
+                  ref.invalidate(flightLogsProvider);
                   if (context.mounted) Navigator.pop(context);
                 },
                 child: const Text('Guardar vuelo'),

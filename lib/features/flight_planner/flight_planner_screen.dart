@@ -6,12 +6,123 @@ import '../../core/services/providers.dart';
 import '../../core/widgets/aura_background.dart';
 import '../../core/widgets/aura_glass_card.dart';
 
-class FlightPlannerScreen extends ConsumerWidget {
+class FlightPlannerScreen extends ConsumerStatefulWidget {
   const FlightPlannerScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FlightPlannerScreen> createState() =>
+      _FlightPlannerScreenState();
+}
+
+class _FlightPlannerScreenState extends ConsumerState<FlightPlannerScreen> {
+  static const _checklistItems = [
+    'Helices revisadas',
+    'Baterias cargadas',
+    'Control cargado',
+    'Memoria disponible',
+    'Clima revisado',
+    'KP revisado',
+    'Zona revisada',
+    'Home Point actualizado',
+    'GPS estable',
+    'Plan de emergencia listo',
+  ];
+
+  Map<String, bool> _checked = {
+    for (final item in _checklistItems) item: false,
+  };
+  bool _loaded = false;
+  bool _generatingShotlist = false;
+  String? _aiShotlist;
+  String? _aiShotlistError;
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.microtask(_loadChecklist);
+  }
+
+  Future<void> _loadChecklist() async {
+    final user = ref.read(currentUserProvider);
+    if (user == null) return;
+    final saved = await ref
+        .read(userDataServiceProvider)
+        .loadPreflightChecklist(user.id);
+    if (!mounted) return;
+    setState(() {
+      _checked = {
+        for (final item in _checklistItems) item: saved[item] ?? false,
+      };
+      _loaded = true;
+    });
+  }
+
+  Future<void> _setChecked(String item, bool value) async {
+    final next = {..._checked, item: value};
+    setState(() => _checked = next);
+    final user = ref.read(currentUserProvider);
+    if (user != null) {
+      await ref
+          .read(userDataServiceProvider)
+          .savePreflightChecklist(user.id, next);
+    }
+  }
+
+  Future<void> _resetChecklist() async {
+    final next = {for (final item in _checklistItems) item: false};
+    setState(() => _checked = next);
+    final user = ref.read(currentUserProvider);
+    if (user != null) {
+      await ref
+          .read(userDataServiceProvider)
+          .savePreflightChecklist(user.id, next);
+    }
+  }
+
+  Future<void> _generateShotlist() async {
+    setState(() {
+      _generatingShotlist = true;
+      _aiShotlistError = null;
+    });
+    try {
+      final weather = await ref.read(weatherProvider.future);
+      final location = await ref.read(locationProvider.future);
+      final kp = await ref.read(kpProvider.future);
+      final flyScore = await ref.read(flyScoreProvider.future);
+      final drone = await ref.read(activeDroneProvider.future);
+      final drones = await ref.read(dronesProvider.future);
+      final battery = await ref.read(activeBatteryProvider.future);
+      final profile = await ref.read(userProfileProvider.future);
+      final answer = await ref
+          .read(openAIServiceProvider)
+          .ask(
+            message:
+                'Genera un shotlist breve para un vuelo hoy. Usa ubicacion actual, hora local, clima, objetivo ${profile?.mainGoal ?? 'contenido'}, dron activo y bateria disponible. Devuelve 4 tomas con riesgo y consejo de camara.',
+            history: const [],
+            weather: weather,
+            location: location,
+            kp: kp,
+            flyScore: flyScore,
+            drone: drone,
+            drones: drones,
+            battery: battery,
+            pilotLevel: profile?.pilotLevel ?? 'Dato no disponible',
+            totalFlightHours: profile?.totalFlightHours ?? 0,
+          );
+      if (!mounted) return;
+      setState(() => _aiShotlist = answer);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _aiShotlistError = '$error');
+    } finally {
+      if (mounted) setState(() => _generatingShotlist = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final plan = ref.watch(flightPlanProvider);
+    final weather = ref.watch(weatherProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Planear vuelo'),
@@ -39,8 +150,56 @@ class FlightPlannerScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        p.name,
+                        'Checklist previa',
                         style: Theme.of(context).textTheme.headlineMedium,
+                      ),
+                      if (!_loaded) ...[
+                        const SizedBox(height: 8),
+                        const LinearProgressIndicator(minHeight: 2),
+                      ],
+                      const SizedBox(height: 6),
+                      for (final item in _checklistItems)
+                        CheckboxListTile(
+                          value: _checked[item] ?? false,
+                          onChanged: (value) =>
+                              _setChecked(item, value ?? false),
+                          title: Text(item),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: _resetChecklist,
+                          icon: const Icon(Icons.restart_alt),
+                          label: const Text('Reiniciar checklist'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                weather.when(
+                  data: (value) => AuraGlassCard(
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.wb_twilight_outlined),
+                      title: const Text('Hora dorada'),
+                      subtitle: Text(
+                        'Manana ${value.sunrise} - ${_addMinutes(value.sunrise, 60)} | Tarde ${_addMinutes(value.sunset, -60)} - ${value.sunset}',
+                      ),
+                    ),
+                  ),
+                  loading: () => const SizedBox.shrink(),
+                  error: (error, _) => AuraGlassCard(child: Text('$error')),
+                ),
+                const SizedBox(height: 14),
+                AuraGlassCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        p.name,
+                        style: Theme.of(context).textTheme.titleLarge,
                       ),
                       const SizedBox(height: 8),
                       Text('${p.location} - ${p.time} - ${p.type}'),
@@ -55,6 +214,33 @@ class FlightPlannerScreen extends ConsumerWidget {
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 10),
+                AuraGlassCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      FilledButton.icon(
+                        onPressed: _generatingShotlist
+                            ? null
+                            : _generateShotlist,
+                        icon: const Icon(Icons.auto_awesome),
+                        label: Text(
+                          _generatingShotlist
+                              ? 'Generando...'
+                              : 'Generar shotlist con IA',
+                        ),
+                      ),
+                      if (_aiShotlistError != null) ...[
+                        const SizedBox(height: 10),
+                        Text(_aiShotlistError!),
+                      ],
+                      if (_aiShotlist != null) ...[
+                        const SizedBox(height: 10),
+                        Text(_aiShotlist!),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
                 for (final shot in p.shots) ...[
                   AuraGlassCard(
                     child: Column(
@@ -78,32 +264,6 @@ class FlightPlannerScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
                 ],
-                AuraGlassCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Checklist previa',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 8),
-                      for (final item in const [
-                        'Helices revisadas',
-                        'Baterias cargadas',
-                        'Clima y KP revisados',
-                        'Zona y permisos revisados',
-                        'Home Point actualizado',
-                        'Plan de emergencia listo',
-                      ])
-                        CheckboxListTile(
-                          value: true,
-                          onChanged: (_) {},
-                          title: Text(item),
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                    ],
-                  ),
-                ),
               ],
             ),
             loading: () => const Center(child: CircularProgressIndicator()),
@@ -112,5 +272,21 @@ class FlightPlannerScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  String _addMinutes(String hhmm, int minutes) {
+    final parts = hhmm.split(':');
+    if (parts.length != 2) return '--:--';
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return '--:--';
+    final date = DateTime(
+      2000,
+      1,
+      1,
+      hour,
+      minute,
+    ).add(Duration(minutes: minutes));
+    return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 }

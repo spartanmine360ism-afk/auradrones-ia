@@ -18,39 +18,47 @@ class DronesScreen extends ConsumerWidget {
       body: AuraBackground(
         child: SafeArea(
           child: drones.when(
-            data: (items) => ListView.separated(
-              padding: const EdgeInsets.all(12),
-              itemCount: items.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                final drone = items[index];
-                final active = drone.id == profile?.activeDroneId;
-                return AuraGlassCard(
-                  padding: const EdgeInsets.all(12),
-                  child: ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(active ? Icons.check_circle : Icons.flight),
-                    title: Text('${drone.brand} ${drone.model}'),
-                    subtitle: Text(
-                      '${drone.weightGrams} g - ${drone.flightHours} h - ${drone.flightsCount} vuelos',
+            data: (items) {
+              if (items.isEmpty) {
+                return const Center(child: Text('Agrega tu primer dron.'));
+              }
+              return ListView.separated(
+                padding: const EdgeInsets.all(12),
+                itemCount: items.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  final drone = items[index];
+                  final active = drone.id == profile?.activeDroneId;
+                  return AuraGlassCard(
+                    padding: const EdgeInsets.all(12),
+                    child: ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(active ? Icons.check_circle : Icons.flight),
+                      title: Text('${drone.brand} ${drone.model}'),
+                      subtitle: Text(
+                        '${drone.weightGrams} g - ${drone.flightHours} h - ${drone.flightsCount} vuelos',
+                      ),
+                      trailing: PopupMenuButton<String>(
+                        onSelected: (value) =>
+                            _handleAction(context, ref, value, drone),
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(
+                            value: 'active',
+                            child: Text('Elegir activo'),
+                          ),
+                          PopupMenuItem(value: 'edit', child: Text('Editar')),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Text('Eliminar'),
+                          ),
+                        ],
+                      ),
                     ),
-                    trailing: PopupMenuButton<String>(
-                      onSelected: (value) =>
-                          _handleAction(context, ref, value, drone),
-                      itemBuilder: (_) => const [
-                        PopupMenuItem(
-                          value: 'active',
-                          child: Text('Elegir activo'),
-                        ),
-                        PopupMenuItem(value: 'edit', child: Text('Editar')),
-                        PopupMenuItem(value: 'delete', child: Text('Eliminar')),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+                  );
+                },
+              );
+            },
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (error, _) => Center(child: Text('Error: $error')),
           ),
@@ -190,6 +198,7 @@ class DronesScreen extends ConsumerWidget {
                           notes: notes.text.trim(),
                           photoUrl: drone?.photoUrl,
                           createdAt: drone?.createdAt ?? DateTime.now(),
+                          updatedAt: DateTime.now(),
                         ),
                       );
                   ref.invalidate(dronesProvider);

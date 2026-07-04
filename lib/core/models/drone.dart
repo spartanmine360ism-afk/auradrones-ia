@@ -14,6 +14,7 @@ class Drone {
     required this.notes,
     required this.photoUrl,
     required this.createdAt,
+    required this.updatedAt,
   });
 
   final String id;
@@ -30,6 +31,7 @@ class Drone {
   final String notes;
   final String? photoUrl;
   final DateTime createdAt;
+  final DateTime updatedAt;
 
   Drone copyWith({
     String? id,
@@ -45,6 +47,7 @@ class Drone {
     DateTime? purchaseDate,
     String? notes,
     String? photoUrl,
+    DateTime? updatedAt,
   }) {
     return Drone(
       id: id ?? this.id,
@@ -61,44 +64,69 @@ class Drone {
       notes: notes ?? this.notes,
       photoUrl: photoUrl ?? this.photoUrl,
       createdAt: createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
-      'marca': brand,
-      'modelo': model,
-      'numeroSerie': serialNumber,
-      'peso': weightGrams,
-      'tipo': type,
-      'fechaCompra': purchaseDate?.toIso8601String(),
-      'horasVuelo': flightHours,
-      'vuelosRealizados': flightsCount,
-      'estado': status,
-      'mantenimientoProximo': nextMaintenance,
-      'notas': notes,
-      'foto': photoUrl,
-      'fechaCreacion': createdAt.toIso8601String(),
+      'brand': brand,
+      'model': model,
+      'serialNumber': serialNumber,
+      'weightGrams': weightGrams,
+      'type': type,
+      'purchaseDate': purchaseDate?.toIso8601String(),
+      'totalFlightHours': flightHours,
+      'flightsCount': flightsCount,
+      'status': status,
+      'nextMaintenance': nextMaintenance,
+      'notes': notes,
+      'photoUrl': photoUrl,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
     };
   }
 
   factory Drone.fromMap(String id, Map<String, dynamic> map) {
     return Drone(
       id: id,
-      brand: map['marca'] as String? ?? '',
-      model: map['modelo'] as String? ?? '',
-      serialNumber: map['numeroSerie'] as String? ?? '',
-      weightGrams: ((map['peso'] as num?) ?? 0).round(),
-      type: map['tipo'] as String? ?? 'Otro',
-      purchaseDate: DateTime.tryParse(map['fechaCompra'] as String? ?? ''),
-      flightHours: ((map['horasVuelo'] as num?) ?? 0).toDouble(),
-      flightsCount: ((map['vuelosRealizados'] as num?) ?? 0).round(),
-      status: map['estado'] as String? ?? 'Listo',
-      nextMaintenance: map['mantenimientoProximo'] as String? ?? '',
-      notes: map['notas'] as String? ?? '',
-      photoUrl: map['foto'] as String?,
+      brand: map['brand'] as String? ?? map['marca'] as String? ?? '',
+      model: map['model'] as String? ?? map['modelo'] as String? ?? '',
+      serialNumber:
+          map['serialNumber'] as String? ?? map['numeroSerie'] as String? ?? '',
+      weightGrams: ((map['weightGrams'] as num?) ?? (map['peso'] as num?) ?? 0)
+          .round(),
+      type: map['type'] as String? ?? map['tipo'] as String? ?? 'Otro',
+      purchaseDate: DateTime.tryParse(
+        map['purchaseDate'] as String? ?? map['fechaCompra'] as String? ?? '',
+      ),
+      flightHours:
+          ((map['totalFlightHours'] as num?) ??
+                  (map['flightHours'] as num?) ??
+                  (map['horasVuelo'] as num?) ??
+                  0)
+              .toDouble(),
+      flightsCount:
+          ((map['flightsCount'] as num?) ??
+                  (map['vuelosRealizados'] as num?) ??
+                  0)
+              .round(),
+      status: map['status'] as String? ?? map['estado'] as String? ?? 'Listo',
+      nextMaintenance:
+          map['nextMaintenance'] as String? ??
+          map['mantenimientoProximo'] as String? ??
+          '',
+      notes: map['notes'] as String? ?? map['notas'] as String? ?? '',
+      photoUrl: map['photoUrl'] as String? ?? map['foto'] as String?,
       createdAt:
-          DateTime.tryParse(map['fechaCreacion'] as String? ?? '') ??
+          DateTime.tryParse(
+            map['createdAt'] as String? ??
+                map['fechaCreacion'] as String? ??
+                '',
+          ) ??
+          DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(map['updatedAt'] as String? ?? '') ??
           DateTime.now(),
     );
   }

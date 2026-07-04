@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/services/providers.dart';
 import '../../core/widgets/aura_background.dart';
 import '../../core/widgets/aura_glass_card.dart';
+import '../shared/aura_community_card.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -75,6 +76,8 @@ class SettingsScreen extends ConsumerWidget {
                   'API keys por --dart-define. No se guardan en Firestore.',
                 ),
               ),
+              const SizedBox(height: 12),
+              const AuraCommunityCard(),
               const SizedBox(height: 12),
               FilledButton.icon(
                 onPressed: () async {

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/services/providers.dart';
 import '../../core/widgets/aura_background.dart';
 import '../../core/widgets/aura_glass_card.dart';
+import '../shared/aura_community_card.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -76,6 +77,8 @@ class ProfileScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
+                const SizedBox(height: 12),
+                const AuraCommunityCard(),
               ],
             ),
             loading: () => const Center(child: CircularProgressIndicator()),

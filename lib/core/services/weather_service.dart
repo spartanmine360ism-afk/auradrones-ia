@@ -11,6 +11,15 @@ abstract class WeatherService {
   Future<WeatherSnapshot> current(LocationSnapshot location);
 }
 
+class WeatherServiceException implements Exception {
+  const WeatherServiceException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class WeatherApiService implements WeatherService {
   WeatherApiService({http.Client? client, String? apiKey})
     : _client = client ?? http.Client(),
@@ -48,7 +57,12 @@ class WeatherApiService implements WeatherService {
       if (responses.any(
         (response) => response.statusCode < 200 || response.statusCode >= 300,
       )) {
-        return MockWeatherService().current(location);
+        final failed = responses.firstWhere(
+          (response) => response.statusCode < 200 || response.statusCode >= 300,
+        );
+        throw WeatherServiceException(
+          'OpenWeather respondio ${failed.statusCode}: ${failed.body}',
+        );
       }
 
       final currentJson =
@@ -99,8 +113,10 @@ class WeatherApiService implements WeatherService {
         sunset: _formatEpoch(sys['sunset'] as num?),
         hourly: hourly.isEmpty ? MockData.weather.hourly : hourly,
       );
-    } catch (_) {
-      return MockWeatherService().current(location);
+    } on WeatherServiceException {
+      rethrow;
+    } catch (error) {
+      throw WeatherServiceException('No se pudo consultar OpenWeather: $error');
     }
   }
 

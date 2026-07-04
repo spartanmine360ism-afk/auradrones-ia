@@ -6,6 +6,7 @@ import '../../features/academy/academy_screen.dart';
 import '../../features/ai_assistant/ai_chat_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/onboarding_screen.dart';
+import '../../features/auth/verify_email_screen.dart';
 import '../../features/batteries/batteries_screen.dart';
 import '../../features/drones/drones_screen.dart';
 import '../../features/flight_planner/flight_planner_screen.dart';
@@ -24,6 +25,10 @@ final appRouter = GoRouter(
   routes: [
     GoRoute(path: '/', builder: (_, _) => const SplashScreen()),
     GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
+    GoRoute(
+      path: '/verify-email',
+      builder: (_, _) => const VerifyEmailScreen(),
+    ),
     GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingScreen()),
     ShellRoute(
       builder: (context, state, child) => AuraShell(child: child),
@@ -66,13 +71,20 @@ class AuraShell extends ConsumerWidget {
       });
       return const Scaffold(body: SizedBox.shrink());
     }
-    final path = GoRouterState.of(context).uri.path;
+    if (!user.emailVerified) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) context.go('/verify-email');
+      });
+      return const Scaffold(body: SizedBox.shrink());
+    }
+    final path = GoRouter.of(context).routeInformationProvider.value.uri.path;
     final index = switch (path) {
       '/home' => 0,
       '/weather' || '/score' => 1,
       '/ai' => 2,
       '/planner' || '/drones' || '/batteries' => 3,
-      _ => 4,
+      '/academy' => 4,
+      _ => 5,
     };
 
     return Scaffold(
@@ -85,6 +97,7 @@ class AuraShell extends ConsumerWidget {
             1 => '/weather',
             2 => '/ai',
             3 => '/planner',
+            4 => '/academy',
             _ => '/profile',
           };
           context.go(route);
@@ -109,6 +122,11 @@ class AuraShell extends ConsumerWidget {
             icon: Icon(Icons.flight_takeoff_outlined),
             selectedIcon: Icon(Icons.flight_takeoff),
             label: 'Vuelo',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.school_outlined),
+            selectedIcon: Icon(Icons.school),
+            label: 'Academia',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),

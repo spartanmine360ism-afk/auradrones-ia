@@ -16,6 +16,8 @@ abstract class AuthService {
   });
   Future<AuthUser> signIn({required String email, required String password});
   Future<void> sendPasswordReset(String email);
+  Future<void> sendEmailVerification();
+  Future<AuthUser?> reloadCurrentUser();
   Future<void> signOut();
 }
 
@@ -59,6 +61,7 @@ class FirebaseAuthService implements AuthService {
       password: password,
     );
     await credential.user?.updateDisplayName(name);
+    await credential.user?.sendEmailVerification();
     final user = _mapUser(credential.user)!;
     await _userDataService.ensureUserProfile(user);
     return user;
@@ -88,6 +91,21 @@ class FirebaseAuthService implements AuthService {
   }
 
   @override
+  Future<void> sendEmailVerification() async {
+    if (!FirebaseBootstrap.initialized) return;
+    await _auth.currentUser?.sendEmailVerification();
+  }
+
+  @override
+  Future<AuthUser?> reloadCurrentUser() async {
+    if (!FirebaseBootstrap.initialized) {
+      return DevAuthService.instance.reloadCurrentUser();
+    }
+    await _auth.currentUser?.reload();
+    return _mapUser(_auth.currentUser);
+  }
+
+  @override
   Future<void> signOut() async {
     if (!FirebaseBootstrap.initialized) {
       return DevAuthService.instance.signOut();
@@ -101,6 +119,7 @@ class FirebaseAuthService implements AuthService {
       id: user.uid,
       email: user.email ?? '',
       name: user.displayName ?? user.email?.split('@').first ?? 'Piloto',
+      emailVerified: user.emailVerified,
     );
   }
 }
@@ -127,7 +146,12 @@ class DevAuthService implements AuthService {
     required String email,
     required String password,
   }) async {
-    _user = AuthUser(id: 'dev-user', email: email, name: name);
+    _user = AuthUser(
+      id: 'dev-user',
+      email: email,
+      name: name,
+      emailVerified: true,
+    );
     _controller.add(_user);
     return _user!;
   }
@@ -141,6 +165,7 @@ class DevAuthService implements AuthService {
       id: 'dev-user',
       email: email,
       name: email.split('@').first,
+      emailVerified: true,
     );
     _controller.add(_user);
     return _user!;
@@ -148,6 +173,12 @@ class DevAuthService implements AuthService {
 
   @override
   Future<void> sendPasswordReset(String email) async {}
+
+  @override
+  Future<void> sendEmailVerification() async {}
+
+  @override
+  Future<AuthUser?> reloadCurrentUser() async => _user;
 
   @override
   Future<void> signOut() async {
