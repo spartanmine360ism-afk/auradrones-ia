@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/services/firebase_bootstrap.dart';
 import '../../core/services/providers.dart';
 import '../../core/widgets/aura_background.dart';
 import '../../core/widgets/aura_glass_card.dart';
@@ -105,6 +106,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       _register ? 'Crear cuenta' : 'Iniciar sesion',
                       style: Theme.of(context).textTheme.headlineMedium,
                     ),
+                    if (FirebaseBootstrap.localMode) ...[
+                      const SizedBox(height: 10),
+                      const _ModeBanner(
+                        text:
+                            'Modo local: Firebase no esta configurado en esta build.',
+                      ),
+                    ] else if (FirebaseBootstrap.failed) ...[
+                      const SizedBox(height: 10),
+                      _ModeBanner(
+                        text:
+                            'Error real de Firebase: ${FirebaseBootstrap.failureMessage}',
+                      ),
+                    ],
                     const SizedBox(height: 14),
                     if (_register)
                       TextField(
@@ -156,6 +170,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ModeBanner extends StatelessWidget {
+  const _ModeBanner({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.amber.withValues(alpha: .14),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.amber.withValues(alpha: .35)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Text(text, style: Theme.of(context).textTheme.bodySmall),
       ),
     );
   }

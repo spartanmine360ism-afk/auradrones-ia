@@ -14,6 +14,8 @@ class SplashScreen extends ConsumerStatefulWidget {
 }
 
 class _SplashScreenState extends ConsumerState<SplashScreen> {
+  String? _error;
+
   @override
   void initState() {
     super.initState();
@@ -21,48 +23,63 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _route() async {
-    final auth = ref.read(authServiceProvider);
-    final user = auth.currentUser ?? await auth.authStateChanges().first;
-    if (!mounted) return;
-    if (user == null) {
-      context.go('/login');
-      return;
-    }
-    if (!user.emailVerified) {
-      context.go('/verify-email');
-      return;
-    }
-    final profile = await ref
-        .read(userDataServiceProvider)
-        .ensureUserProfile(user);
-    if (profile.emailVerified != user.emailVerified) {
-      await ref
+    try {
+      final auth = ref.read(authServiceProvider);
+      final user = auth.currentUser ?? await auth.authStateChanges().first;
+      if (!mounted) return;
+      if (user == null) {
+        context.go('/login');
+        return;
+      }
+      if (!user.emailVerified) {
+        context.go('/verify-email');
+        return;
+      }
+      final profile = await ref
           .read(userDataServiceProvider)
-          .saveProfile(profile.copyWith(emailVerified: user.emailVerified));
+          .ensureUserProfile(user);
+      if (profile.emailVerified != user.emailVerified) {
+        await ref
+            .read(userDataServiceProvider)
+            .saveProfile(profile.copyWith(emailVerified: user.emailVerified));
+      }
+      if (!mounted) return;
+      context.go(profile.onboardingComplete ? '/home' : '/onboarding');
+    } catch (error) {
+      if (mounted) setState(() => _error = '$error');
     }
-    if (!mounted) return;
-    context.go(profile.onboardingComplete ? '/home' : '/onboarding');
   }
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       body: AuraBackground(
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.radar, size: 76, color: AuraColors.cyan),
-              SizedBox(height: 18),
-              Text(
+              const Icon(Icons.radar, size: 76, color: AuraColors.cyan),
+              const SizedBox(height: 18),
+              const Text(
                 'Aura Pilot',
                 style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900),
               ),
-              SizedBox(height: 8),
-              Text(
+              const SizedBox(height: 8),
+              const Text(
                 'Fly smarter. Film safer.',
                 style: TextStyle(color: AuraColors.muted),
               ),
+              if (_error != null) ...[
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Text(
+                    _error!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: AuraColors.danger),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

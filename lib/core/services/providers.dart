@@ -183,7 +183,7 @@ class UserDroneService implements DroneService {
   @override
   Future<List<Drone>> all() async {
     final user = ref.watch(currentUserProvider);
-    if (user == null) return MockData.drones;
+    if (user == null) return const [];
     final stream = ref.watch(userDataServiceProvider).watchDrones(user.id);
     return stream.first;
   }
@@ -197,7 +197,7 @@ class UserBatteryService implements BatteryService {
   @override
   Future<List<DroneBattery>> all() async {
     final user = ref.watch(currentUserProvider);
-    if (user == null) return MockData.batteries;
+    if (user == null) return const [];
     final stream = ref.watch(userDataServiceProvider).watchBatteries(user.id);
     return stream.first;
   }

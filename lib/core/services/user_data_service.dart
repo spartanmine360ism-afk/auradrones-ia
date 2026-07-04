@@ -56,11 +56,16 @@ class FirestoreUserDataService implements UserDataService {
   CollectionReference<Map<String, dynamic>> get _users =>
       _db.collection('users');
 
+  StateError get _firebaseFailure => StateError(
+    'Firebase esta configurado pero Firestore no pudo iniciar: ${FirebaseBootstrap.failureMessage}',
+  );
+
   @override
   Stream<UserProfile?> watchProfile(String userId) {
-    if (!FirebaseBootstrap.initialized) {
+    if (FirebaseBootstrap.localMode) {
       return DevUserDataService.instance.watchProfile(userId);
     }
+    if (FirebaseBootstrap.failed) return Stream.error(_firebaseFailure);
     return _users.doc(userId).snapshots().map((doc) {
       final data = doc.data();
       return data == null ? null : UserProfile.fromMap(doc.id, data);
@@ -69,9 +74,10 @@ class FirestoreUserDataService implements UserDataService {
 
   @override
   Future<UserProfile> ensureUserProfile(AuthUser user) async {
-    if (!FirebaseBootstrap.initialized) {
+    if (FirebaseBootstrap.localMode) {
       return DevUserDataService.instance.ensureUserProfile(user);
     }
+    if (FirebaseBootstrap.failed) throw _firebaseFailure;
     final ref = _users.doc(user.id);
     final doc = await ref.get();
     if (doc.exists && doc.data() != null) {
@@ -96,17 +102,19 @@ class FirestoreUserDataService implements UserDataService {
 
   @override
   Future<void> saveProfile(UserProfile profile) async {
-    if (!FirebaseBootstrap.initialized) {
+    if (FirebaseBootstrap.localMode) {
       return DevUserDataService.instance.saveProfile(profile);
     }
+    if (FirebaseBootstrap.failed) throw _firebaseFailure;
     await _users.doc(profile.id).set(profile.toMap(), SetOptions(merge: true));
   }
 
   @override
   Stream<List<Drone>> watchDrones(String userId) {
-    if (!FirebaseBootstrap.initialized) {
+    if (FirebaseBootstrap.localMode) {
       return DevUserDataService.instance.watchDrones(userId);
     }
+    if (FirebaseBootstrap.failed) return Stream.error(_firebaseFailure);
     return _users
         .doc(userId)
         .collection('drones')
@@ -120,9 +128,10 @@ class FirestoreUserDataService implements UserDataService {
 
   @override
   Future<void> saveDrone(String userId, Drone drone) async {
-    if (!FirebaseBootstrap.initialized) {
+    if (FirebaseBootstrap.localMode) {
       return DevUserDataService.instance.saveDrone(userId, drone);
     }
+    if (FirebaseBootstrap.failed) throw _firebaseFailure;
     final ref = drone.id.isEmpty
         ? _users.doc(userId).collection('drones').doc()
         : _users.doc(userId).collection('drones').doc(drone.id);
@@ -134,17 +143,19 @@ class FirestoreUserDataService implements UserDataService {
 
   @override
   Future<void> deleteDrone(String userId, String droneId) async {
-    if (!FirebaseBootstrap.initialized) {
+    if (FirebaseBootstrap.localMode) {
       return DevUserDataService.instance.deleteDrone(userId, droneId);
     }
+    if (FirebaseBootstrap.failed) throw _firebaseFailure;
     await _users.doc(userId).collection('drones').doc(droneId).delete();
   }
 
   @override
   Stream<List<DroneBattery>> watchBatteries(String userId) {
-    if (!FirebaseBootstrap.initialized) {
+    if (FirebaseBootstrap.localMode) {
       return DevUserDataService.instance.watchBatteries(userId);
     }
+    if (FirebaseBootstrap.failed) return Stream.error(_firebaseFailure);
     return _users
         .doc(userId)
         .collection('batteries')
@@ -158,9 +169,10 @@ class FirestoreUserDataService implements UserDataService {
 
   @override
   Future<void> saveBattery(String userId, DroneBattery battery) async {
-    if (!FirebaseBootstrap.initialized) {
+    if (FirebaseBootstrap.localMode) {
       return DevUserDataService.instance.saveBattery(userId, battery);
     }
+    if (FirebaseBootstrap.failed) throw _firebaseFailure;
     final ref = battery.id.isEmpty
         ? _users.doc(userId).collection('batteries').doc()
         : _users.doc(userId).collection('batteries').doc(battery.id);
@@ -172,17 +184,19 @@ class FirestoreUserDataService implements UserDataService {
 
   @override
   Future<void> deleteBattery(String userId, String batteryId) async {
-    if (!FirebaseBootstrap.initialized) {
+    if (FirebaseBootstrap.localMode) {
       return DevUserDataService.instance.deleteBattery(userId, batteryId);
     }
+    if (FirebaseBootstrap.failed) throw _firebaseFailure;
     await _users.doc(userId).collection('batteries').doc(batteryId).delete();
   }
 
   @override
   Stream<List<FlightLog>> watchFlights(String userId) {
-    if (!FirebaseBootstrap.initialized) {
+    if (FirebaseBootstrap.localMode) {
       return DevUserDataService.instance.watchFlights(userId);
     }
+    if (FirebaseBootstrap.failed) return Stream.error(_firebaseFailure);
     return _users.doc(userId).collection('flights').snapshots().map((snapshot) {
       final flights = snapshot.docs
           .map((doc) => FlightLog.fromMap(doc.id, doc.data()))
@@ -194,9 +208,10 @@ class FirestoreUserDataService implements UserDataService {
 
   @override
   Future<void> saveFlight(String userId, FlightLog flight) async {
-    if (!FirebaseBootstrap.initialized) {
+    if (FirebaseBootstrap.localMode) {
       return DevUserDataService.instance.saveFlight(userId, flight);
     }
+    if (FirebaseBootstrap.failed) throw _firebaseFailure;
     final ref = flight.id.isEmpty
         ? _users.doc(userId).collection('flights').doc()
         : _users.doc(userId).collection('flights').doc(flight.id);
@@ -205,9 +220,10 @@ class FirestoreUserDataService implements UserDataService {
 
   @override
   Future<Map<String, bool>> loadPreflightChecklist(String userId) async {
-    if (!FirebaseBootstrap.initialized) {
+    if (FirebaseBootstrap.localMode) {
       return DevUserDataService.instance.loadPreflightChecklist(userId);
     }
+    if (FirebaseBootstrap.failed) throw _firebaseFailure;
     final doc = await _users
         .doc(userId)
         .collection('flightState')
@@ -222,9 +238,10 @@ class FirestoreUserDataService implements UserDataService {
     String userId,
     Map<String, bool> values,
   ) async {
-    if (!FirebaseBootstrap.initialized) {
+    if (FirebaseBootstrap.localMode) {
       return DevUserDataService.instance.savePreflightChecklist(userId, values);
     }
+    if (FirebaseBootstrap.failed) throw _firebaseFailure;
     await _users.doc(userId).collection('flightState').doc('preflight').set({
       'items': values,
       'updatedAt': DateTime.now().toIso8601String(),

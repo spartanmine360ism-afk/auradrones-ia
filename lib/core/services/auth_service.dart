@@ -27,19 +27,25 @@ class FirebaseAuthService implements AuthService {
   final UserDataService _userDataService;
   firebase_auth.FirebaseAuth get _auth => firebase_auth.FirebaseAuth.instance;
 
+  StateError get _firebaseFailure => StateError(
+    'Firebase esta configurado pero no pudo iniciar: ${FirebaseBootstrap.failureMessage}',
+  );
+
   @override
   Stream<AuthUser?> authStateChanges() {
-    if (!FirebaseBootstrap.initialized) {
+    if (FirebaseBootstrap.localMode) {
       return DevAuthService.instance.authStateChanges();
     }
+    if (FirebaseBootstrap.failed) return Stream.error(_firebaseFailure);
     return _auth.authStateChanges().map(_mapUser);
   }
 
   @override
   AuthUser? get currentUser {
-    if (!FirebaseBootstrap.initialized) {
+    if (FirebaseBootstrap.localMode) {
       return DevAuthService.instance.currentUser;
     }
+    if (FirebaseBootstrap.failed) return null;
     return _mapUser(_auth.currentUser);
   }
 
@@ -49,13 +55,14 @@ class FirebaseAuthService implements AuthService {
     required String email,
     required String password,
   }) async {
-    if (!FirebaseBootstrap.initialized) {
+    if (FirebaseBootstrap.localMode) {
       return DevAuthService.instance.register(
         name: name,
         email: email,
         password: password,
       );
     }
+    if (FirebaseBootstrap.failed) throw _firebaseFailure;
     final credential = await _auth.createUserWithEmailAndPassword(
       email: email,
       password: password,
@@ -72,9 +79,10 @@ class FirebaseAuthService implements AuthService {
     required String email,
     required String password,
   }) async {
-    if (!FirebaseBootstrap.initialized) {
+    if (FirebaseBootstrap.localMode) {
       return DevAuthService.instance.signIn(email: email, password: password);
     }
+    if (FirebaseBootstrap.failed) throw _firebaseFailure;
     final credential = await _auth.signInWithEmailAndPassword(
       email: email,
       password: password,
@@ -86,30 +94,34 @@ class FirebaseAuthService implements AuthService {
 
   @override
   Future<void> sendPasswordReset(String email) async {
-    if (!FirebaseBootstrap.initialized) return;
+    if (FirebaseBootstrap.localMode) return;
+    if (FirebaseBootstrap.failed) throw _firebaseFailure;
     await _auth.sendPasswordResetEmail(email: email);
   }
 
   @override
   Future<void> sendEmailVerification() async {
-    if (!FirebaseBootstrap.initialized) return;
+    if (FirebaseBootstrap.localMode) return;
+    if (FirebaseBootstrap.failed) throw _firebaseFailure;
     await _auth.currentUser?.sendEmailVerification();
   }
 
   @override
   Future<AuthUser?> reloadCurrentUser() async {
-    if (!FirebaseBootstrap.initialized) {
+    if (FirebaseBootstrap.localMode) {
       return DevAuthService.instance.reloadCurrentUser();
     }
+    if (FirebaseBootstrap.failed) throw _firebaseFailure;
     await _auth.currentUser?.reload();
     return _mapUser(_auth.currentUser);
   }
 
   @override
   Future<void> signOut() async {
-    if (!FirebaseBootstrap.initialized) {
+    if (FirebaseBootstrap.localMode) {
       return DevAuthService.instance.signOut();
     }
+    if (FirebaseBootstrap.failed) throw _firebaseFailure;
     await _auth.signOut();
   }
 
