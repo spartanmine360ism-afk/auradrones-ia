@@ -42,7 +42,7 @@ class AuraSpaceWeatherEngine {
       _ensureOk(response);
 
       final decoded = jsonDecode(response.body);
-      final row = _lastListRow(decoded);
+      final row = _lastValidListRow(decoded);
       final value = double.parse('${row[1]}');
       final timestamp =
           DateTime.tryParse('${row[0]}Z') ?? DateTime.now().toUtc();
@@ -63,7 +63,7 @@ class AuraSpaceWeatherEngine {
       _ensureOk(response);
 
       final decoded = jsonDecode(response.body);
-      final item = _lastMap(decoded);
+      final item = _lastValidMap(decoded, ['time_tag', 'time', 'datetime']);
       final value = _firstNumber(item, ['kp_index', 'Kp', 'kp']);
       final timestamp = _firstDate(item, ['time_tag', 'time', 'datetime']);
       return _available('NOAA SWPC 1m KP', value, timestamp);
@@ -85,7 +85,7 @@ class AuraSpaceWeatherEngine {
       _ensureOk(response);
 
       final decoded = jsonDecode(response.body);
-      final item = _lastMap(decoded);
+      final item = _lastValidMap(decoded, ['time', 'datetime', 'timestamp']);
       final value = _firstNumber(item, ['Kp', 'kp', 'value']);
       final timestamp = _firstDate(item, ['time', 'datetime', 'timestamp']);
       return _available('GFZ Potsdam', value, timestamp);
@@ -113,8 +113,8 @@ class AuraSpaceWeatherEngine {
       _ensureOk(plasma);
       _ensureOk(mag);
 
-      final plasmaRow = _lastListRow(jsonDecode(plasma.body));
-      final magRow = _lastListRow(jsonDecode(mag.body));
+      final plasmaRow = _lastValidListRow(jsonDecode(plasma.body));
+      final magRow = _lastValidListRow(jsonDecode(mag.body));
       final speed = double.parse('${plasmaRow[2]}');
       final bz = double.parse('${magRow[3]}');
       final value = _solarWindToKp(speed, bz);
@@ -198,19 +198,21 @@ class AuraSpaceWeatherEngine {
     }
   }
 
-  List<dynamic> _lastListRow(dynamic decoded) {
+  List<dynamic> _lastValidListRow(dynamic decoded) {
     if (decoded is! List) throw const FormatException('expected list');
+    final now = DateTime.now().toUtc();
     for (final row in decoded.reversed) {
-      if (row is List &&
-          row.length >= 2 &&
-          double.tryParse('${row[1]}') != null) {
+      if (row is! List || row.length < 2) continue;
+      final value = double.tryParse('${row[1]}');
+      final timestamp = _parseUtc('${row[0]}');
+      if (value != null && timestamp != null && !timestamp.isAfter(now)) {
         return row;
       }
     }
-    throw const FormatException('no numeric rows');
+    throw const FormatException('no valid past rows');
   }
 
-  Map<String, dynamic> _lastMap(dynamic decoded) {
+  Map<String, dynamic> _lastValidMap(dynamic decoded, List<String> timeKeys) {
     final list = decoded is List
         ? decoded
         : decoded is Map<String, dynamic>
@@ -218,10 +220,15 @@ class AuraSpaceWeatherEngine {
               decoded['observations'] as List<dynamic>? ??
               [])
         : const [];
+    final now = DateTime.now().toUtc();
+
     for (final item in list.reversed) {
-      if (item is Map<String, dynamic>) return item;
+      if (item is! Map<String, dynamic>) continue;
+      final timestamp = _firstOptionalDate(item, timeKeys);
+      if (timestamp == null || !timestamp.isAfter(now)) return item;
     }
-    throw const FormatException('no object rows');
+
+    throw const FormatException('no valid past object rows');
   }
 
   double _firstNumber(Map<String, dynamic> item, List<String> keys) {
@@ -238,6 +245,21 @@ class AuraSpaceWeatherEngine {
       if (value != null) return value.toUtc();
     }
     return DateTime.now().toUtc();
+  }
+
+  DateTime? _firstOptionalDate(Map<String, dynamic> item, List<String> keys) {
+    for (final key in keys) {
+      final value = _parseUtc('${item[key]}');
+      if (value != null) return value;
+    }
+    return null;
+  }
+
+  DateTime? _parseUtc(String value) {
+    if (value.trim().isEmpty || value == 'null') return null;
+    final parsed = DateTime.tryParse(value);
+    if (parsed != null) return parsed.toUtc();
+    return DateTime.tryParse('${value}Z')?.toUtc();
   }
 
   double _solarWindToKp(double speedKms, double bzNt) {

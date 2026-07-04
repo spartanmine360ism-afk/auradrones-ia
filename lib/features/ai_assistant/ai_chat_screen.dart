@@ -45,33 +45,9 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     });
 
     try {
-      final location = await ref.read(locationProvider.future);
-      final kp = await ref.read(kpProvider.future);
-      final flyScore = await ref.read(flyScoreProvider.future);
-      final drone = await ref.read(activeDroneProvider.future);
-      final drones = await ref.read(dronesProvider.future);
-      final battery = await ref.read(activeBatteryProvider.future);
-      final profile = await ref.read(userProfileProvider.future);
-      final checklistSummary = await _checklistSummary();
-      final weather = await _tryWeather();
-      final answer = await ref
-          .read(localAiServiceProvider)
-          .ask(
-            message: text,
-            history: _messages,
-            weather: weather,
-            location: location,
-            kp: kp,
-            flyScore: flyScore,
-            drone: drone,
-            drones: drones,
-            battery: battery,
-            pilotLevel: profile?.pilotLevel ?? 'Dato no disponible',
-            totalFlightHours: profile?.totalFlightHours ?? 0,
-            mainGoal: profile?.mainGoal ?? 'Vuelo seguro',
-            checklistSummary: checklistSummary,
-          )
-          .timeout(const Duration(seconds: 18));
+      final answer = await _buildLocalAnswer(
+        text,
+      ).timeout(const Duration(seconds: 2));
       if (!mounted) return;
       setState(() {
         _messages.add(AiChatMessage(role: 'assistant', text: answer));
@@ -84,7 +60,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
           AiChatMessage(
             role: 'assistant',
             text:
-                'Aura IA Local necesita completar datos reales antes de responder.\n$error',
+                'Aura IA Local no pudo reunir todos los datos a tiempo. Reintenta en unos segundos o revisa clima, KP, dron y bateria.',
             isError: false,
             canRetry: true,
           ),
@@ -97,6 +73,35 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
         });
       }
     }
+  }
+
+  Future<String> _buildLocalAnswer(String text) async {
+    final location = await ref.read(locationProvider.future);
+    final kp = await ref.read(kpProvider.future);
+    final flyScore = await ref.read(flyScoreProvider.future);
+    final drone = await ref.read(activeDroneProvider.future);
+    final drones = await ref.read(dronesProvider.future);
+    final battery = await ref.read(activeBatteryProvider.future);
+    final profile = await ref.read(userProfileProvider.future);
+    final checklistSummary = await _checklistSummary();
+    final weather = await _tryWeather();
+    return ref
+        .read(localAiServiceProvider)
+        .ask(
+          message: text,
+          history: _messages,
+          weather: weather,
+          location: location,
+          kp: kp,
+          flyScore: flyScore,
+          drone: drone,
+          drones: drones,
+          battery: battery,
+          pilotLevel: profile?.pilotLevel ?? 'Dato no disponible',
+          totalFlightHours: profile?.totalFlightHours ?? 0,
+          mainGoal: profile?.mainGoal ?? 'Vuelo seguro',
+          checklistSummary: checklistSummary,
+        );
   }
 
   Future<String> _checklistSummary() async {
