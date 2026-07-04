@@ -14,7 +14,7 @@ App Flutter premium para pilotos de drones, creadores de contenido aereo y vuelo
 - Aura IA Local con reglas internas y contexto real de clima, ubicacion, KP, Fly Score, dron, bateria, checklist y objetivo del piloto.
 - Aura Space Weather Engine con comparacion multi-fuente gratuita para KP y confianza.
 - Mapa gratuito con Flutter Map + OpenStreetMap, ubicacion actual y capas preparadas para zonas/NOTAM.
-- API keys por `--dart-define`, sin secretos en el codigo.
+- Cero costo operativo para clima, mapa e IA: sin Google Maps, sin OpenWeather, sin OpenAI y sin Gemini.
 
 ## Ejecutar
 
@@ -27,7 +27,9 @@ Firebase Auth y Firestore usan `lib/firebase_options.dart`, generado por Flutter
 
 Reglas de seguridad: ver `firestore.rules`.
 
-El clima usa Open-Meteo y el mapa usa tiles publicos de OpenStreetMap mediante `flutter_map`; no requieren API keys ni SDK nativo de Google Maps.
+El clima usa Open-Meteo y el mapa usa tiles publicos de OpenStreetMap mediante `flutter_map`; no requieren API keys, tarjeta bancaria ni SDK nativo de Google Maps.
+
+Aura IA funciona localmente con reglas internas y datos reales disponibles en el dispositivo. No llama a OpenAI, Gemini ni otros servicios de IA de pago.
 
 ## Permisos
 

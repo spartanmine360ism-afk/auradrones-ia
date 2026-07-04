@@ -1,11 +1,10 @@
 import 'package:http/http.dart' as http;
 
 import '../models/kp_index.dart';
+import 'kp_index_service.dart';
 import 'space_weather_engine.dart';
 
-abstract class KpIndexService {
-  Future<KpIndex> current();
-}
+export 'kp_index_service.dart' show KpIndexService;
 
 class AuraKpIndexService implements KpIndexService {
   AuraKpIndexService({AuraSpaceWeatherEngine? engine, http.Client? client})
