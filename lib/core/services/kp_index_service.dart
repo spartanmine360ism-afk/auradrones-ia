@@ -29,60 +29,69 @@ class NoaaKpIndexService implements KpIndexService {
       'services.swpc.noaa.gov',
       '/products/noaa-planetary-k-index.json',
     );
+
     try {
-      final response = await _client
-          .get(uri)
-          .timeout(const Duration(seconds: 12));
+      final response = await _client.get(uri).timeout(
+            const Duration(seconds: 12),
+          );
+
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw KpIndexServiceException(
-          'NOAA SWPC respondio ${response.statusCode}: ${response.body}',
+          'NOAA SWPC respondió ${response.statusCode}',
         );
       }
+
       final decoded = jsonDecode(response.body);
-      if (decoded is! List<dynamic>) {
+
+      if (decoded is! List) {
         throw const KpIndexServiceException(
-          'NOAA SWPC devolvio formato inesperado.',
+          'NOAA SWPC devolvió formato inesperado.',
         );
       }
-      final latest = decoded.whereType<List<dynamic>>().lastWhere(
-        _isValidKpRow,
-        orElse: () => const [],
-      );
-      if (latest.isEmpty) {
-        throw const KpIndexServiceException('NOAA SWPC no devolvio datos KP.');
+
+      double? latestValue;
+
+      for (final item in decoded.reversed) {
+        if (item is Map<String, dynamic>) {
+          latestValue = double.tryParse('${item['Kp'] ?? item['kp']}');
+        } else if (item is List && item.length >= 2) {
+          latestValue = double.tryParse('${item[1]}');
+        }
+
+        if (latestValue != null) break;
       }
-      final value = double.parse('${latest[1]}');
+
+      if (latestValue == null) {
+        throw const KpIndexServiceException(
+          'NOAA SWPC no devolvió datos KP válidos.',
+        );
+      }
+
       final kp = KpIndex(
-        value: value,
-        risk: _risk(value),
-        recommendation: _recommendation(value),
+        value: latestValue,
+        risk: _risk(latestValue),
+        recommendation: _recommendation(latestValue),
       );
+
       _lastKnown = kp;
       return kp;
-    } on KpIndexServiceException {
-      return _fallback();
-    } catch (error) {
+    } catch (_) {
       return _fallback();
     }
   }
 
-  bool _isValidKpRow(List<dynamic> row) {
-    if (row.length < 2) return false;
-    final time = DateTime.tryParse('${row[0]}');
-    final kp = double.tryParse('${row[1]}');
-    return time != null && kp != null;
-  }
-
   KpIndex _fallback() {
     final lastKnown = _lastKnown;
+
     if (lastKnown != null) {
       return KpIndex(
         value: lastKnown.value,
         risk: 'KP no disponible temporalmente',
         recommendation:
-            'Usando ultimo KP conocido (${lastKnown.value.toStringAsFixed(1)}). Reintenta antes de despegar.',
+            'Usando último KP conocido (${lastKnown.value.toStringAsFixed(1)}). Reintenta antes de despegar.',
       );
     }
+
     return const KpIndex(
       value: 0,
       risk: 'KP no disponible temporalmente',
@@ -94,20 +103,23 @@ class NoaaKpIndexService implements KpIndexService {
   String _risk(double value) {
     if (value >= 6) return 'No recomendado para vuelos largos';
     if (value >= 5) return 'Riesgo GPS';
-    if (value >= 4) return 'Precaucion';
+    if (value >= 4) return 'Precaución';
     return 'Estable';
   }
 
   String _recommendation(double value) {
     if (value >= 6) {
-      return 'Evita vuelos largos y misiones GPS criticas.';
+      return 'Evita vuelos largos y misiones GPS críticas.';
     }
+
     if (value >= 5) {
       return 'Riesgo GPS elevado; vuela solo si es necesario y cerca.';
     }
+
     if (value >= 4) {
-      return 'Vuela cerca, revisa satelites y mantente listo para regresar.';
+      return 'Vuela cerca, revisa satélites y mantente listo para regresar.';
     }
-    return 'Condiciones geomagneticas favorables para volar.';
+
+    return 'Condiciones geomagnéticas favorables para volar.';
   }
 }
