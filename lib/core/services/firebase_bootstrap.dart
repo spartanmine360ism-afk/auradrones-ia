@@ -30,12 +30,12 @@ class FirebaseBootstrap {
       initialized = true;
       initializationError = null;
 
-      debugPrint('✅ Firebase inicializado correctamente');
+      debugPrint('Firebase inicializado correctamente');
     } catch (error, stackTrace) {
       initialized = false;
       initializationError = error;
 
-      debugPrint('❌ Error inicializando Firebase');
+      debugPrint('Error inicializando Firebase');
       debugPrint(error.toString());
       debugPrint(stackTrace.toString());
     }

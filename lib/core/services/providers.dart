@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/battery.dart';
 import '../models/drone.dart';
 import '../models/flight_log.dart';
-import '../models/flight_plan.dart';
 import '../models/fly_score.dart';
 import '../models/kp_index.dart';
 import '../models/lesson.dart';
@@ -15,9 +14,9 @@ import '../models/weather_snapshot.dart';
 import 'auth_service.dart';
 import 'fly_score_service.dart';
 import 'location_service.dart';
+import 'local_ai_service.dart';
 import 'map_zone_service.dart';
 import 'mock_data.dart';
-import 'openai_service.dart';
 import 'kp_index_service.dart';
 import 'user_data_service.dart';
 import 'weather_service.dart';
@@ -70,15 +69,10 @@ final droneServiceProvider = Provider<DroneService>(
 final batteryServiceProvider = Provider<BatteryService>(
   (ref) => UserBatteryService(ref),
 );
-final flightPlanServiceProvider = Provider<FlightPlanService>(
-  (ref) => MockFlightPlanService(),
-);
 final academyServiceProvider = Provider<AcademyService>(
   (ref) => MockAcademyService(),
 );
-final openAIServiceProvider = Provider<OpenAIService>(
-  (ref) => OpenAIChatService(),
-);
+final localAiServiceProvider = Provider<AiService>((ref) => LocalAiService());
 final mapZoneServiceProvider = Provider<MapZoneService>(
   (ref) => MockMapZoneService(),
 );
@@ -126,9 +120,6 @@ final activeBatteryProvider = FutureProvider<DroneBattery>((ref) async {
     orElse: () => batteries.first,
   );
 });
-final flightPlanProvider = FutureProvider<FlightPlan>(
-  (ref) => ref.watch(flightPlanServiceProvider).featured(),
-);
 final lessonsProvider = FutureProvider<List<Lesson>>(
   (ref) => ref.watch(academyServiceProvider).featured(),
 );
@@ -167,10 +158,6 @@ abstract class BatteryService {
   Future<List<DroneBattery>> all();
 }
 
-abstract class FlightPlanService {
-  Future<FlightPlan> featured();
-}
-
 abstract class AcademyService {
   Future<List<Lesson>> featured();
 }
@@ -201,11 +188,6 @@ class UserBatteryService implements BatteryService {
     final stream = ref.watch(userDataServiceProvider).watchBatteries(user.id);
     return stream.first;
   }
-}
-
-class MockFlightPlanService implements FlightPlanService {
-  @override
-  Future<FlightPlan> featured() async => MockData.plan;
 }
 
 class MockAcademyService implements AcademyService {

@@ -1,6 +1,5 @@
 import '../models/battery.dart';
 import '../models/drone.dart';
-import '../models/flight_plan.dart';
 import '../models/kp_index.dart';
 import '../models/lesson.dart';
 import '../models/weather_snapshot.dart';
@@ -105,41 +104,6 @@ class MockData {
       updatedAt: DateTime(2026),
     ),
   ];
-
-  static const plan = FlightPlan(
-    name: 'Plan local de vuelo',
-    location: 'Ubicacion actual',
-    time: 'Hora local',
-    type: 'Objetivo del usuario',
-    drone: 'Dron activo',
-    estimatedMinutes: 24,
-    shots: [
-      ShotIdea(
-        name: 'Reveal',
-        description: 'Sube detras de un primer plano y revela la avenida.',
-        difficulty: 'Media',
-        risk: 'Bajo',
-        camera: '4K 60fps, ISO 100, ND16, D-Log M',
-        tip: 'Mantiene velocidad baja y corrige horizonte antes de grabar.',
-      ),
-      ShotIdea(
-        name: 'Orbit',
-        description: 'Orbita lenta alrededor del sujeto principal.',
-        difficulty: 'Media',
-        risk: 'Medio',
-        camera: '4K 30fps, shutter 1/60, WB fijo',
-        tip: 'Ensaya radio amplio y revisa personas alrededor.',
-      ),
-      ShotIdea(
-        name: 'Top Down',
-        description: 'Plano cenital para patrones urbanos.',
-        difficulty: 'Baja',
-        risk: 'Bajo',
-        camera: '4K 30fps, ISO 100, perfil normal',
-        tip: 'Evita sombras de edificios y mantente dentro de linea visual.',
-      ),
-    ],
-  );
 
   static const lessons = [
     Lesson(

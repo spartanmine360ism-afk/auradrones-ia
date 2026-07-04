@@ -94,7 +94,7 @@ class _FlightPlannerScreenState extends ConsumerState<FlightPlannerScreen> {
       final battery = await ref.read(activeBatteryProvider.future);
       final profile = await ref.read(userProfileProvider.future);
       final answer = await ref
-          .read(openAIServiceProvider)
+          .read(localAiServiceProvider)
           .ask(
             message:
                 'Genera un shotlist breve para un vuelo hoy. Usa ubicacion actual, hora local, clima, objetivo ${profile?.mainGoal ?? 'contenido'}, dron activo y bateria disponible. Devuelve 4 tomas con riesgo y consejo de camara.',
@@ -108,6 +108,8 @@ class _FlightPlannerScreenState extends ConsumerState<FlightPlannerScreen> {
             battery: battery,
             pilotLevel: profile?.pilotLevel ?? 'Dato no disponible',
             totalFlightHours: profile?.totalFlightHours ?? 0,
+            mainGoal: profile?.mainGoal ?? 'contenido',
+            checklistSummary: _checklistSummary(),
           );
       if (!mounted) return;
       setState(() => _aiShotlist = answer);
@@ -115,7 +117,7 @@ class _FlightPlannerScreenState extends ConsumerState<FlightPlannerScreen> {
       if (!mounted) return;
       setState(() {
         _aiShotlistError =
-            'Aura IA no pudo generar la lista. Modo local activado.';
+            'Aura IA Local necesita completar datos reales antes de generar.';
         _aiShotlist = _localShotlist();
       });
     } finally {
@@ -129,6 +131,11 @@ class _FlightPlannerScreenState extends ConsumerState<FlightPlannerScreen> {
         '- Orbit amplio del sujeto con radio conservador.\n'
         '- Plano cenital corto para contexto.\n'
         '- Dolly out de cierre manteniendo bateria de regreso.';
+  }
+
+  String _checklistSummary() {
+    final completed = _checked.values.where((value) => value).length;
+    return '$completed/${_checked.length} items listos';
   }
 
   @override
@@ -265,7 +272,7 @@ class _FlightPlannerScreenState extends ConsumerState<FlightPlannerScreen> {
               ),
               const SizedBox(height: 14),
               Text(
-                'Shotlist IA',
+                'Shotlist Aura IA Local',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 10),
@@ -279,7 +286,7 @@ class _FlightPlannerScreenState extends ConsumerState<FlightPlannerScreen> {
                       label: Text(
                         _generatingShotlist
                             ? 'Generando...'
-                            : 'Generar shotlist con IA',
+                            : 'Generar shotlist local',
                       ),
                     ),
                     if (_aiShotlistError != null) ...[

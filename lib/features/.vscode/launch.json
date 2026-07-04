@@ -7,8 +7,9 @@
       "type": "dart",
       "deviceId": "87f2eff9",
       "toolArgs": [
-        "--dart-define=GEMINI_API_KEY=TU_API_DE_GEMINI",
-        "--dart-define=WEATHER_API_KEY=TU_API_DE_OPENWEATHER"
+        "--dart-define=GEMINI_API_KEY=AIzaSyClQS8LdcOLID0U4MlG0s8efq2g5_zfZR0",
+        "--dart-define=WEATHER_API_KEY=6e2df16291a7489452887a6b014039f2",
+        "--dart-define=GOOGLE_MAPS_API_KEY=AIzaSyDa0i0AtXce7sKPbzsgQYjZ6zsqDR-W1Ek"
       ]
     }
   ]

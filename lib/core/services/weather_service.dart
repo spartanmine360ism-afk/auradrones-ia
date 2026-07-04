@@ -30,7 +30,11 @@ class WeatherApiService implements WeatherService {
 
   @override
   Future<WeatherSnapshot> current(LocationSnapshot location) async {
-    if (_apiKey.isEmpty) return MockWeatherService().current(location);
+    if (_apiKey.isEmpty) {
+      throw const WeatherServiceException(
+        'WEATHER_API_KEY no llego a la app. Revisa launch.json o --dart-define.',
+      );
+    }
 
     final currentUri =
         Uri.https('api.openweathermap.org', '/data/2.5/weather', {
@@ -40,6 +44,7 @@ class WeatherApiService implements WeatherService {
           'units': 'metric',
           'lang': 'es',
         });
+
     final forecastUri =
         Uri.https('api.openweathermap.org', '/data/2.5/forecast', {
           'lat': '${location.latitude}',
@@ -54,14 +59,16 @@ class WeatherApiService implements WeatherService {
         _client.get(currentUri).timeout(const Duration(seconds: 12)),
         _client.get(forecastUri).timeout(const Duration(seconds: 12)),
       ]);
+
       if (responses.any(
         (response) => response.statusCode < 200 || response.statusCode >= 300,
       )) {
         final failed = responses.firstWhere(
           (response) => response.statusCode < 200 || response.statusCode >= 300,
         );
+
         throw WeatherServiceException(
-          'OpenWeather respondio ${failed.statusCode}: ${failed.body}',
+          'OpenWeather respondió ${failed.statusCode}: ${failed.body}',
         );
       }
 
@@ -69,6 +76,7 @@ class WeatherApiService implements WeatherService {
           jsonDecode(responses.first.body) as Map<String, dynamic>;
       final forecastJson =
           jsonDecode(responses.last.body) as Map<String, dynamic>;
+
       final main = currentJson['main'] as Map<String, dynamic>;
       final wind = currentJson['wind'] as Map<String, dynamic>? ?? {};
       final clouds = currentJson['clouds'] as Map<String, dynamic>? ?? {};
@@ -84,6 +92,7 @@ class WeatherApiService implements WeatherService {
             final pop = ((data['pop'] as num?) ?? 0) * 100;
             final dtTxt = data['dt_txt'] as String? ?? '';
             final label = dtTxt.length >= 16 ? dtTxt.substring(11, 16) : 'Hora';
+
             return HourlyForecast(
               label,
               (itemMain['temp'] as num).toDouble(),
@@ -125,48 +134,34 @@ class WeatherApiService implements WeatherService {
     Map<String, dynamic> rain,
   ) {
     final list = (forecastJson['list'] as List<dynamic>? ?? []).take(4);
+
     final maxPop = list.fold<double>(0, (max, item) {
       final pop = (((item as Map<String, dynamic>)['pop'] as num?) ?? 0)
           .toDouble();
+
       return pop > max ? pop : max;
     });
+
     final rainVolume = ((rain['1h'] as num?) ?? rain['3h'] ?? 0).toDouble();
+
     return (maxPop * 100 + (rainVolume > 0 ? 15 : 0)).clamp(0, 100).round();
   }
 
   String _formatEpoch(num? epoch) {
     if (epoch == null) return '--:--';
+
     final date = DateTime.fromMillisecondsSinceEpoch(
       epoch.toInt() * 1000,
     ).toLocal();
-    return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+
+    return '${date.hour.toString().padLeft(2, '0')}:'
+        '${date.minute.toString().padLeft(2, '0')}';
   }
 
   String _directionFromDegrees(double? degrees) {
     if (degrees == null) return 'N/D';
+
     const labels = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
     return labels[((degrees + 22.5) ~/ 45) % 8];
-  }
-}
-
-class MockWeatherService implements WeatherService {
-  @override
-  Future<WeatherSnapshot> current(LocationSnapshot location) async {
-    return WeatherSnapshot(
-      city: location.city,
-      coordinates: location.coordinates,
-      temperatureC: MockData.weather.temperatureC,
-      feelsLikeC: MockData.weather.feelsLikeC,
-      windKmh: MockData.weather.windKmh,
-      gustKmh: MockData.weather.gustKmh,
-      windDirection: MockData.weather.windDirection,
-      humidity: MockData.weather.humidity,
-      visibilityKm: MockData.weather.visibilityKm,
-      cloudCover: MockData.weather.cloudCover,
-      rainChance: MockData.weather.rainChance,
-      sunrise: MockData.weather.sunrise,
-      sunset: MockData.weather.sunset,
-      hourly: MockData.weather.hourly,
-    );
   }
 }

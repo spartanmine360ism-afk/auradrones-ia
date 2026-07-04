@@ -31,9 +31,9 @@ class NoaaKpIndexService implements KpIndexService {
     );
 
     try {
-      final response = await _client.get(uri).timeout(
-            const Duration(seconds: 12),
-          );
+      final response = await _client
+          .get(uri)
+          .timeout(const Duration(seconds: 12));
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw KpIndexServiceException(

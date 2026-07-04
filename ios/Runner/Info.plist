@@ -30,8 +30,6 @@
 	<string>Aura Drones IA usa tu ubicacion para calcular clima, Fly Score, zonas cercanas y recomendaciones de vuelo.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Aura Drones IA puede usar tu ubicacion para alertas inteligentes de vuelo y seguridad cuando actives funciones avanzadas.</string>
-	<key>GoogleMapsApiKey</key>
-	<string>$(GOOGLE_MAPS_API_KEY)</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
