@@ -5,10 +5,7 @@
       "name": "Aura Drones IA",
       "request": "launch",
       "type": "dart",
-      "program": "lib/main.dart",
-      "args": [
-        "--dart-define=WEATHER_API_KEY=${env:WEATHER_API_KEY}"
-      ]
+      "program": "lib/main.dart"
     }
   ]
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/models/weather_snapshot.dart';
 import '../../core/services/providers.dart';
 import '../../core/widgets/aura_background.dart';
 import '../../core/widgets/aura_glass_card.dart';
@@ -85,7 +86,6 @@ class _FlightPlannerScreenState extends ConsumerState<FlightPlannerScreen> {
       _aiShotlistError = null;
     });
     try {
-      final weather = await ref.read(weatherProvider.future);
       final location = await ref.read(locationProvider.future);
       final kp = await ref.read(kpProvider.future);
       final flyScore = await ref.read(flyScoreProvider.future);
@@ -93,6 +93,7 @@ class _FlightPlannerScreenState extends ConsumerState<FlightPlannerScreen> {
       final drones = await ref.read(dronesProvider.future);
       final battery = await ref.read(activeBatteryProvider.future);
       final profile = await ref.read(userProfileProvider.future);
+      final weather = await _tryWeather();
       final answer = await ref
           .read(localAiServiceProvider)
           .ask(
@@ -131,6 +132,14 @@ class _FlightPlannerScreenState extends ConsumerState<FlightPlannerScreen> {
         '- Orbit amplio del sujeto con radio conservador.\n'
         '- Plano cenital corto para contexto.\n'
         '- Dolly out de cierre manteniendo bateria de regreso.';
+  }
+
+  Future<WeatherSnapshot?> _tryWeather() async {
+    try {
+      return await ref.read(weatherProvider.future);
+    } catch (_) {
+      return null;
+    }
   }
 
   String _checklistSummary() {

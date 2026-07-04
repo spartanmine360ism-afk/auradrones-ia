@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/ai_chat_message.dart';
+import '../../core/models/weather_snapshot.dart';
 import '../../core/services/providers.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/widgets/aura_background.dart';
@@ -44,7 +45,6 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     });
 
     try {
-      final weather = await ref.read(weatherProvider.future);
       final location = await ref.read(locationProvider.future);
       final kp = await ref.read(kpProvider.future);
       final flyScore = await ref.read(flyScoreProvider.future);
@@ -53,6 +53,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
       final battery = await ref.read(activeBatteryProvider.future);
       final profile = await ref.read(userProfileProvider.future);
       final checklistSummary = await _checklistSummary();
+      final weather = await _tryWeather();
       final answer = await ref
           .read(localAiServiceProvider)
           .ask(
@@ -109,6 +110,14 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
 
     final completed = saved.values.where((value) => value).length;
     return '$completed/${saved.length} items listos';
+  }
+
+  Future<WeatherSnapshot?> _tryWeather() async {
+    try {
+      return await ref.read(weatherProvider.future);
+    } catch (_) {
+      return null;
+    }
   }
 
   void _clearChat() {

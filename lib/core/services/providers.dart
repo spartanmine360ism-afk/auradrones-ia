@@ -17,7 +17,7 @@ import 'location_service.dart';
 import 'local_ai_service.dart';
 import 'map_zone_service.dart';
 import 'mock_data.dart';
-import 'kp_index_service.dart';
+import 'kp_service.dart';
 import 'user_data_service.dart';
 import 'weather_service.dart';
 
@@ -61,7 +61,7 @@ final weatherServiceProvider = Provider<WeatherService>(
   (ref) => WeatherApiService(),
 );
 final kpIndexServiceProvider = Provider<KpIndexService>(
-  (ref) => NoaaKpIndexService(),
+  (ref) => AuraKpIndexService(),
 );
 final droneServiceProvider = Provider<DroneService>(
   (ref) => UserDroneService(ref),
@@ -74,7 +74,7 @@ final academyServiceProvider = Provider<AcademyService>(
 );
 final localAiServiceProvider = Provider<AiService>((ref) => LocalAiService());
 final mapZoneServiceProvider = Provider<MapZoneService>(
-  (ref) => MockMapZoneService(),
+  (ref) => EmptyMapZoneService(),
 );
 
 final locationProvider = FutureProvider<LocationSnapshot>(
@@ -129,7 +129,6 @@ final mapZonesProvider = FutureProvider<List<MapZone>>((ref) async {
 });
 
 final flyScoreProvider = FutureProvider<FlyScore>((ref) async {
-  final weather = await ref.watch(weatherProvider.future);
   final kp = await ref.watch(kpProvider.future);
   final location = await ref.watch(locationProvider.future);
   final battery = await ref.watch(activeBatteryProvider.future);
@@ -137,8 +136,26 @@ final flyScoreProvider = FutureProvider<FlyScore>((ref) async {
   final isRestricted = await ref
       .watch(mapZoneServiceProvider)
       .isRestricted(location);
+  WeatherSnapshot? weather;
+  try {
+    weather = await ref.watch(weatherProvider.future);
+  } catch (_) {
+    return FlyScore(
+      value: 0,
+      status: 'pendiente por clima',
+      explanation:
+          '${location.city}: falta clima real para calcular el Fly Score completo.',
+      positiveFactors: [
+        'KP ${kp.value.toStringAsFixed(1)}: ${kp.risk}',
+        'Bateria ${battery.level}%',
+      ],
+      negativeFactors: const ['Clima no disponible temporalmente'],
+      recommendation:
+          'Espera a que el clima vuelva a estar disponible antes de despegar. Revisa viento, rachas y lluvia manualmente.',
+    );
+  }
   return FlyScoreService().calculate(
-    weather: weather,
+    weather: weather!,
     kp: kp,
     location: location,
     batteryLevel: battery.level,
@@ -147,6 +164,7 @@ final flyScoreProvider = FutureProvider<FlyScore>((ref) async {
         ref.watch(userProfileProvider).value?.pilotLevel ??
         'Dato no disponible',
     droneType: drone.type,
+    droneWeightGrams: drone.weightGrams,
   );
 });
 

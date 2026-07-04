@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/constants/drone_constants.dart';
 import '../../core/models/battery.dart';
 import '../../core/models/drone.dart';
 import '../../core/services/providers.dart';
@@ -73,7 +74,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           model: _droneModel.text.trim(),
           serialNumber: _droneSerial.text.trim(),
           weightGrams: int.tryParse(_droneWeight.text.trim()) ?? 0,
-          type: 'Multirotor',
+          type: DroneConstants.defaultDroneType,
           flightHours: 0,
           flightsCount: 0,
           status: 'Listo',

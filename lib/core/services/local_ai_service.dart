@@ -10,7 +10,7 @@ abstract class AiService {
   Future<String> ask({
     required String message,
     required List<AiChatMessage> history,
-    required WeatherSnapshot weather,
+    required WeatherSnapshot? weather,
     required LocationSnapshot location,
     required KpIndex kp,
     required FlyScore flyScore,
@@ -29,7 +29,7 @@ class LocalAiService implements AiService {
   Future<String> ask({
     required String message,
     required List<AiChatMessage> history,
-    required WeatherSnapshot weather,
+    required WeatherSnapshot? weather,
     required LocationSnapshot location,
     required KpIndex kp,
     required FlyScore flyScore,
@@ -41,10 +41,12 @@ class LocalAiService implements AiService {
     required String mainGoal,
     required String checklistSummary,
   }) async {
-    final text = _normalize(message);
+    final text = message.toLowerCase();
 
     if (_containsAny(text, ['hola', 'buenas', 'hey'])) {
-      return _intro(location, weather, flyScore, drone, battery);
+      return 'Aura IA Local lista.\n'
+          'Estoy leyendo ${location.city}, Fly Score ${flyScore.value}, ${_weatherLine(weather)} y bateria ${battery.level}%.\n'
+          'Dime si quieres decision de vuelo, riesgos, filtro ND o una shotlist para tu ${drone.brand} ${drone.model}.';
     }
 
     if (_containsAny(text, ['puedo volar', 'volar hoy', 'conviene volar'])) {
@@ -67,54 +69,45 @@ class LocalAiService implements AiService {
       return _batteryAdvice(battery, drone, flyScore);
     }
 
-    return _general(
-      message: message,
-      weather: weather,
-      location: location,
-      kp: kp,
-      flyScore: flyScore,
-      drone: drone,
-      battery: battery,
-      pilotLevel: pilotLevel,
-      totalFlightHours: totalFlightHours,
-      mainGoal: mainGoal,
-    );
-  }
-
-  String _intro(
-    LocationSnapshot location,
-    WeatherSnapshot weather,
-    FlyScore flyScore,
-    Drone drone,
-    DroneBattery battery,
-  ) {
-    return 'Aura IA Local lista.\n'
-        'Estoy leyendo ${location.city}, Fly Score ${flyScore.value}, viento ${weather.windKmh.round()} km/h y bateria ${battery.level}%.\n'
-        'Dime si quieres decision de vuelo, riesgos, filtro ND o una shotlist para tu ${drone.brand} ${drone.model}.';
+    return 'Aura IA Local analiza "$message" con tus datos reales:\n'
+        '- ${location.city}, ${_weatherLine(weather)}.\n'
+        '- KP ${kp.value.toStringAsFixed(1)}, Fly Score ${flyScore.value} (${flyScore.status}).\n'
+        '- ${drone.brand} ${drone.model}, bateria ${battery.level}%.\n'
+        '- Perfil: $pilotLevel, ${totalFlightHours.toStringAsFixed(1)} h, objetivo $mainGoal.\n'
+        'Mi consejo: ${flyScore.recommendation}';
   }
 
   String _canFly(
-    WeatherSnapshot weather,
+    WeatherSnapshot? weather,
     KpIndex kp,
     FlyScore flyScore,
     Drone drone,
     DroneBattery battery,
     String checklistSummary,
   ) {
-    final decision = _flightDecision(flyScore, weather, kp, battery);
+    final decision = weather == null
+        ? 'No puedo confirmar vuelo hasta recuperar clima real.'
+        : _flightDecision(flyScore, weather, kp, battery);
     final alerts = _alerts(weather, kp, flyScore, battery);
 
     return '$decision\n'
         '- Fly Score: ${flyScore.value} (${flyScore.status}).\n'
-        '- Viento: ${weather.windKmh.round()} km/h, rachas ${weather.gustKmh.round()} km/h.\n'
-        '- KP: ${kp.value.toStringAsFixed(1)} (${kp.risk}). Lluvia: ${weather.rainChance}%.\n'
+        '- Clima: ${_weatherLine(weather)}.\n'
+        '- KP: ${kp.value.toStringAsFixed(1)} (${kp.risk}).\n'
         '- Bateria ${battery.name}: ${battery.level}% y salud ${battery.health}%.\n'
         '- Dron activo: ${drone.brand} ${drone.model}. Checklist: $checklistSummary.\n'
         '${alerts.isEmpty ? flyScore.recommendation : 'Atencion: ${alerts.join(' ')}'}';
   }
 
-  String _ndAdvice(WeatherSnapshot weather, String mainGoal) {
-    final golden = _goldenHourText(weather);
+  String _ndAdvice(WeatherSnapshot? weather, String mainGoal) {
+    if (weather == null) {
+      return 'Para $mainGoal no puedo afinar ND sin clima/luz real.\n'
+          '- Usa ISO 100.\n'
+          '- Si hay sol fuerte, prueba ND16.\n'
+          '- Si estas cerca de golden hour, prueba ND8.\n'
+          '- Ajusta con histograma antes de despegar.';
+    }
+
     final nd = _recommendedNd(weather);
     final shutter = weather.cloudCover > 70
         ? '1/60 en 30fps'
@@ -122,36 +115,39 @@ class LocalAiService implements AiService {
 
     return 'Para $mainGoal usaria $nd como punto de partida.\n'
         '- Luz: nubes ${weather.cloudCover}%, lluvia ${weather.rainChance}%, temperatura ${weather.temperatureC.round()} C.\n'
-        '- $golden\n'
+        '- ${_goldenHourText(weather)}\n'
         '- Manten ISO 100 y prueba shutter $shutter.\n'
         '- Si el histograma se va a la derecha, sube un paso de ND; si queda oscuro, baja un paso.';
   }
 
   String _shotlist(
     LocationSnapshot location,
-    WeatherSnapshot weather,
+    WeatherSnapshot? weather,
     FlyScore flyScore,
     Drone drone,
     DroneBattery battery,
     String mainGoal,
   ) {
-    final speed = weather.gustKmh > 28
+    final speed = weather != null && weather.gustKmh > 28
         ? 'muy lento y cerca'
         : 'suave y constante';
+    final lightCue = weather == null
+        ? 'cuando la luz sea estable'
+        : 'durante ${_goldenHourText(weather).toLowerCase()}';
     final batteryNote = battery.level < 45
         ? 'Haz solo 2-3 tomas y guarda regreso.'
         : 'Puedes hacer 4 tomas con margen de regreso.';
 
     return 'Shotlist local para ${location.city} ($mainGoal):\n'
-        '1. Reveal bajo: sube $speed para revelar el lugar. Riesgo: viento/obstaculos.\n'
-        '2. Orbit amplio con ${drone.brand} ${drone.model}: radio conservador, sujeto al centro.\n'
+        '1. Reveal bajo: sube $speed para revelar el lugar.\n'
+        '2. Orbit amplio con ${drone.brand} ${drone.model}: radio conservador.\n'
         '3. Top down corto: 8-10 segundos para contexto, evita gente y cables.\n'
-        '4. Dolly out de cierre durante ${_goldenHourText(weather).toLowerCase()}.\n'
+        '4. Dolly out de cierre $lightCue.\n'
         'Fly Score ${flyScore.value}. Bateria ${battery.level}%. $batteryNote';
   }
 
   String _risks(
-    WeatherSnapshot weather,
+    WeatherSnapshot? weather,
     KpIndex kp,
     FlyScore flyScore,
     DroneBattery battery,
@@ -164,7 +160,7 @@ class LocalAiService implements AiService {
 
     return 'Riesgos actuales:\n'
         '$list\n'
-        '- Visibilidad: ${weather.visibilityKm.toStringAsFixed(1)} km.\n'
+        '- Clima: ${_weatherLine(weather)}.\n'
         '- Checklist: $checklistSummary.\n'
         'Recomendacion: ${flyScore.recommendation}';
   }
@@ -179,26 +175,6 @@ class LocalAiService implements AiService {
     return 'Bateria activa ${battery.name} en ${battery.level}% para ${drone.brand} ${drone.model}.\n'
         'Salud ${battery.health}%, ciclos ${battery.cycles}, estado ${battery.status}.\n'
         '$reserve Fly Score ${flyScore.value}.';
-  }
-
-  String _general({
-    required String message,
-    required WeatherSnapshot weather,
-    required LocationSnapshot location,
-    required KpIndex kp,
-    required FlyScore flyScore,
-    required Drone drone,
-    required DroneBattery battery,
-    required String pilotLevel,
-    required double totalFlightHours,
-    required String mainGoal,
-  }) {
-    return 'Aura IA Local analiza "$message" con tus datos reales:\n'
-        '- ${location.city}, ${weather.temperatureC.round()} C, viento ${weather.windKmh.round()} km/h, rachas ${weather.gustKmh.round()} km/h.\n'
-        '- KP ${kp.value.toStringAsFixed(1)}, Fly Score ${flyScore.value} (${flyScore.status}).\n'
-        '- ${drone.brand} ${drone.model}, bateria ${battery.level}%.\n'
-        '- Perfil: $pilotLevel, ${totalFlightHours.toStringAsFixed(1)} h, objetivo $mainGoal.\n'
-        'Mi consejo: ${flyScore.recommendation}';
   }
 
   String _flightDecision(
@@ -227,26 +203,25 @@ class LocalAiService implements AiService {
   }
 
   List<String> _alerts(
-    WeatherSnapshot weather,
+    WeatherSnapshot? weather,
     KpIndex kp,
     FlyScore flyScore,
     DroneBattery battery,
   ) {
-    final alerts = <String>[
-      if (weather.gustKmh >= 30)
+    return [
+      if (weather == null) 'Clima no disponible temporalmente.',
+      if (weather != null && weather.gustKmh >= 30)
         'Rachas altas: ${weather.gustKmh.round()} km/h.',
-      if (weather.windKmh >= 24)
+      if (weather != null && weather.windKmh >= 24)
         'Viento sostenido elevado: ${weather.windKmh.round()} km/h.',
-      if (weather.rainChance >= 45)
+      if (weather != null && weather.rainChance >= 45)
         'Probabilidad de lluvia ${weather.rainChance}%.',
-      if (weather.visibilityKm < 5)
+      if (weather != null && weather.visibilityKm < 5)
         'Visibilidad baja: ${weather.visibilityKm.toStringAsFixed(1)} km.',
       if (kp.value >= 5) 'KP elevado: ${kp.value.toStringAsFixed(1)}.',
       if (battery.level < 45) 'Bateria baja: ${battery.level}%.',
       ...flyScore.negativeFactors.take(2),
     ];
-
-    return alerts;
   }
 
   String _recommendedNd(WeatherSnapshot weather) {
@@ -262,20 +237,17 @@ class LocalAiService implements AiService {
     final now = DateTime.now();
     final sunrise = _timeToday(weather.sunrise);
     final sunset = _timeToday(weather.sunset);
-
     if (sunrise == null || sunset == null) return false;
 
-    final morningEnd = sunrise.add(const Duration(minutes: 60));
-    final eveningStart = sunset.subtract(const Duration(minutes: 60));
-
-    return (now.isAfter(sunrise) && now.isBefore(morningEnd)) ||
-        (now.isAfter(eveningStart) && now.isBefore(sunset));
+    return (now.isAfter(sunrise) &&
+            now.isBefore(sunrise.add(const Duration(minutes: 60)))) ||
+        (now.isAfter(sunset.subtract(const Duration(minutes: 60))) &&
+            now.isBefore(sunset));
   }
 
   String _goldenHourText(WeatherSnapshot weather) {
     final morningEnd = _addMinutes(weather.sunrise, 60);
     final eveningStart = _addMinutes(weather.sunset, -60);
-
     return 'Golden hour: manana ${weather.sunrise}-$morningEnd, tarde $eveningStart-${weather.sunset}';
   }
 
@@ -299,7 +271,10 @@ class LocalAiService implements AiService {
     return '${next.hour.toString().padLeft(2, '0')}:${next.minute.toString().padLeft(2, '0')}';
   }
 
-  String _normalize(String value) => value.toLowerCase();
+  String _weatherLine(WeatherSnapshot? weather) {
+    if (weather == null) return 'clima no disponible temporalmente';
+    return '${weather.temperatureC.round()} C, viento ${weather.windKmh.round()} km/h, rachas ${weather.gustKmh.round()} km/h, lluvia ${weather.rainChance}%';
+  }
 
   bool _containsAny(String value, List<String> terms) {
     return terms.any(value.contains);

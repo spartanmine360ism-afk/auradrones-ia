@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/constants/drone_constants.dart';
 import '../../core/models/battery.dart';
 import '../../core/services/providers.dart';
 import '../../core/theme/aura_theme.dart';
@@ -114,7 +115,11 @@ class BatteriesScreen extends ConsumerWidget {
     final lastUse = TextEditingController(text: battery?.lastUse ?? '');
     final lastCharge = TextEditingController(text: battery?.lastCharge ?? '');
     final notes = TextEditingController(text: battery?.notes ?? '');
-    String status = battery?.status ?? 'buena';
+    const batteryStatuses = ['buena', 'revisar', 'reemplazar'];
+    String status = DroneConstants.safeSelection(
+      battery?.status,
+      batteryStatuses,
+    );
 
     await showModalBottomSheet<void>(
       context: context,
@@ -173,10 +178,14 @@ class BatteriesScreen extends ConsumerWidget {
               ),
               DropdownButtonFormField(
                 initialValue: status,
-                items: const ['buena', 'revisar', 'reemplazar']
+                items: batteryStatuses
                     .map((v) => DropdownMenuItem(value: v, child: Text(v)))
                     .toList(),
-                onChanged: (v) => status = v!,
+                onChanged: (v) {
+                  if (v != null) {
+                    status = DroneConstants.safeSelection(v, batteryStatuses);
+                  }
+                },
                 decoration: const InputDecoration(labelText: 'Estado'),
               ),
               TextField(

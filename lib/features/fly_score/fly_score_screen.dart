@@ -13,6 +13,7 @@ class FlyScoreScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final score = ref.watch(flyScoreProvider);
+    final kp = ref.watch(kpProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Fly Score')),
       body: AuraBackground(
@@ -90,6 +91,46 @@ class FlyScoreScreen extends ConsumerWidget {
                           ),
                     ],
                   ),
+                ),
+                const SizedBox(height: 14),
+                kp.when(
+                  data: (value) => AuraGlassCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Aura Space Weather Engine',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        Text('KP actual: ${value.value.toStringAsFixed(1)}'),
+                        Text(
+                          'KP promedio: ${value.average.toStringAsFixed(1)}',
+                        ),
+                        Text(
+                          'KP recomendado: ${value.recommended.toStringAsFixed(1)}',
+                        ),
+                        Text('Confianza: ${value.confidence}'),
+                        Text(
+                          'Desviacion estandar: ${value.standardDeviation.toStringAsFixed(2)}',
+                        ),
+                        Text(
+                          'Min/Max: ${value.minimum.toStringAsFixed(1)} / ${value.maximum.toStringAsFixed(1)}',
+                        ),
+                        Text(
+                          'Origen de datos: ${value.dataOrigins.isEmpty ? 'Sin fuentes disponibles' : value.dataOrigins.join(', ')}',
+                        ),
+                        if (value.updatedAt != null)
+                          Text(
+                            'Ultima actualizacion: ${value.updatedAt!.toLocal()}',
+                          ),
+                      ],
+                    ),
+                  ),
+                  loading: () => const AuraGlassCard(
+                    child: Text('Consultando Aura Space Weather Engine'),
+                  ),
+                  error: (error, _) => AuraGlassCard(child: Text('$error')),
                 ),
                 const SizedBox(height: 14),
                 const AuraGlassCard(

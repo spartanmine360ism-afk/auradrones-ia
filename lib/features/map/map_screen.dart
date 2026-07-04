@@ -68,11 +68,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Mapa gratuito con OpenStreetMap',
-                        style: TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 6),
                       Text('Coordenadas: ${current.coordinates}'),
                       Text(
                         'Precision GPS: ${current.accuracyMeters.round()} m',
@@ -255,7 +250,7 @@ class _OpenStreetMapView extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(10),
               child: Text(
-                'Mapa gratuito con OpenStreetMap\n${location.coordinates}',
+                location.coordinates,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),

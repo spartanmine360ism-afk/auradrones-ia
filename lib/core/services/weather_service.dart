@@ -2,10 +2,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import '../constants/app_constants.dart';
 import '../models/location_snapshot.dart';
 import '../models/weather_snapshot.dart';
-import 'mock_data.dart';
 
 abstract class WeatherService {
   Future<WeatherSnapshot> current(LocationSnapshot location);
@@ -21,146 +19,133 @@ class WeatherServiceException implements Exception {
 }
 
 class WeatherApiService implements WeatherService {
-  WeatherApiService({http.Client? client, String? apiKey})
-    : _client = client ?? http.Client(),
-      _apiKey = apiKey ?? AppConstants.weatherApiKey;
+  WeatherApiService({http.Client? client}) : _client = client ?? http.Client();
 
   final http.Client _client;
-  final String _apiKey;
+  static WeatherSnapshot? _lastKnown;
 
   @override
   Future<WeatherSnapshot> current(LocationSnapshot location) async {
-    if (_apiKey.isEmpty) {
-      throw const WeatherServiceException(
-        'WEATHER_API_KEY no llego a la app. Revisa launch.json o --dart-define.',
-      );
-    }
-
-    final currentUri =
-        Uri.https('api.openweathermap.org', '/data/2.5/weather', {
-          'lat': '${location.latitude}',
-          'lon': '${location.longitude}',
-          'appid': _apiKey,
-          'units': 'metric',
-          'lang': 'es',
-        });
-
-    final forecastUri =
-        Uri.https('api.openweathermap.org', '/data/2.5/forecast', {
-          'lat': '${location.latitude}',
-          'lon': '${location.longitude}',
-          'appid': _apiKey,
-          'units': 'metric',
-          'lang': 'es',
-        });
+    final uri = Uri.https('api.open-meteo.com', '/v1/forecast', {
+      'latitude': '${location.latitude}',
+      'longitude': '${location.longitude}',
+      'current':
+          'temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,cloud_cover,visibility,wind_speed_10m,wind_gusts_10m,wind_direction_10m',
+      'hourly':
+          'temperature_2m,precipitation_probability,wind_speed_10m,wind_gusts_10m',
+      'daily': 'sunrise,sunset',
+      'timezone': 'auto',
+    });
 
     try {
-      final responses = await Future.wait([
-        _client.get(currentUri).timeout(const Duration(seconds: 12)),
-        _client.get(forecastUri).timeout(const Duration(seconds: 12)),
-      ]);
-
-      if (responses.any(
-        (response) => response.statusCode < 200 || response.statusCode >= 300,
-      )) {
-        final failed = responses.firstWhere(
-          (response) => response.statusCode < 200 || response.statusCode >= 300,
-        );
-
-        throw WeatherServiceException(
-          'OpenWeather respondió ${failed.statusCode}: ${failed.body}',
+      final response = await _client
+          .get(uri)
+          .timeout(const Duration(seconds: 12));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw const WeatherServiceException(
+          'Clima no disponible temporalmente',
         );
       }
 
-      final currentJson =
-          jsonDecode(responses.first.body) as Map<String, dynamic>;
-      final forecastJson =
-          jsonDecode(responses.last.body) as Map<String, dynamic>;
-
-      final main = currentJson['main'] as Map<String, dynamic>;
-      final wind = currentJson['wind'] as Map<String, dynamic>? ?? {};
-      final clouds = currentJson['clouds'] as Map<String, dynamic>? ?? {};
-      final rain = currentJson['rain'] as Map<String, dynamic>? ?? {};
-      final sys = currentJson['sys'] as Map<String, dynamic>? ?? {};
-      final cityName = (currentJson['name'] as String?)?.trim();
-
-      final hourly = ((forecastJson['list'] as List<dynamic>? ?? []).take(8))
-          .map((item) {
-            final data = item as Map<String, dynamic>;
-            final itemMain = data['main'] as Map<String, dynamic>;
-            final itemWind = data['wind'] as Map<String, dynamic>? ?? {};
-            final pop = ((data['pop'] as num?) ?? 0) * 100;
-            final dtTxt = data['dt_txt'] as String? ?? '';
-            final label = dtTxt.length >= 16 ? dtTxt.substring(11, 16) : 'Hora';
-
-            return HourlyForecast(
-              label,
-              (itemMain['temp'] as num).toDouble(),
-              ((itemWind['speed'] as num?) ?? 0).toDouble() * 3.6,
-              pop.round(),
-            );
-          })
-          .toList();
-
-      return WeatherSnapshot(
-        city: cityName?.isNotEmpty == true ? cityName! : location.city,
-        coordinates: location.coordinates,
-        temperatureC: (main['temp'] as num).toDouble(),
-        feelsLikeC: (main['feels_like'] as num).toDouble(),
-        windKmh: ((wind['speed'] as num?) ?? 0).toDouble() * 3.6,
-        gustKmh:
-            ((wind['gust'] as num?) ?? wind['speed'] ?? 0).toDouble() * 3.6,
-        windDirection: _directionFromDegrees((wind['deg'] as num?)?.toDouble()),
-        humidity: (main['humidity'] as num).round(),
-        visibilityKm:
-            ((((currentJson['visibility'] as num?) ?? 0).toDouble() / 1000)
-                    .clamp(0, 99))
-                .toDouble(),
-        cloudCover: ((clouds['all'] as num?) ?? 0).round(),
-        rainChance: _estimateRainChance(forecastJson, rain),
-        sunrise: _formatEpoch(sys['sunrise'] as num?),
-        sunset: _formatEpoch(sys['sunset'] as num?),
-        hourly: hourly.isEmpty ? MockData.weather.hourly : hourly,
-      );
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      final snapshot = _fromOpenMeteo(json, location);
+      _lastKnown = snapshot;
+      return snapshot;
     } on WeatherServiceException {
+      final cached = _lastKnown;
+      if (cached != null) return cached;
       rethrow;
-    } catch (error) {
-      throw WeatherServiceException('No se pudo consultar OpenWeather: $error');
+    } catch (_) {
+      final cached = _lastKnown;
+      if (cached != null) return cached;
+      throw const WeatherServiceException('Clima no disponible temporalmente');
     }
   }
 
-  int _estimateRainChance(
-    Map<String, dynamic> forecastJson,
-    Map<String, dynamic> rain,
+  WeatherSnapshot _fromOpenMeteo(
+    Map<String, dynamic> json,
+    LocationSnapshot location,
   ) {
-    final list = (forecastJson['list'] as List<dynamic>? ?? []).take(4);
+    final current = json['current'] as Map<String, dynamic>? ?? {};
+    final hourly = json['hourly'] as Map<String, dynamic>? ?? {};
+    final daily = json['daily'] as Map<String, dynamic>? ?? {};
 
-    final maxPop = list.fold<double>(0, (max, item) {
-      final pop = (((item as Map<String, dynamic>)['pop'] as num?) ?? 0)
-          .toDouble();
+    final hourlyForecast = _hourlyForecast(hourly);
 
-      return pop > max ? pop : max;
+    return WeatherSnapshot(
+      city: location.city,
+      coordinates: location.coordinates,
+      temperatureC: _number(current['temperature_2m']),
+      feelsLikeC: _number(current['apparent_temperature']),
+      windKmh: _number(current['wind_speed_10m']),
+      gustKmh: _number(current['wind_gusts_10m']),
+      windDirection: _directionFromDegrees(
+        _number(current['wind_direction_10m']),
+      ),
+      humidity: _number(current['relative_humidity_2m']).round(),
+      visibilityKm: (_number(current['visibility']) / 1000)
+          .clamp(0, 99)
+          .toDouble(),
+      cloudCover: _number(current['cloud_cover']).round(),
+      rainChance: hourlyForecast.isEmpty
+          ? _rainFromPrecipitation(current)
+          : hourlyForecast.first.rainChance,
+      sunrise: _timeFromDaily(daily['sunrise']),
+      sunset: _timeFromDaily(daily['sunset']),
+      hourly: hourlyForecast,
+    );
+  }
+
+  List<HourlyForecast> _hourlyForecast(Map<String, dynamic> hourly) {
+    final times = hourly['time'] as List<dynamic>? ?? [];
+    final temps = hourly['temperature_2m'] as List<dynamic>? ?? [];
+    final rain = hourly['precipitation_probability'] as List<dynamic>? ?? [];
+    final wind = hourly['wind_speed_10m'] as List<dynamic>? ?? [];
+
+    if (times.isEmpty || temps.isEmpty || rain.isEmpty || wind.isEmpty) {
+      return const [];
+    }
+
+    final length = [
+      times.length,
+      temps.length,
+      rain.length,
+      wind.length,
+    ].fold<int>(8, (max, value) => value < max ? value : max);
+
+    return List.generate(length.clamp(0, 8), (index) {
+      final rawTime = times[index].toString();
+      final label = rawTime.length >= 16 ? rawTime.substring(11, 16) : 'Hora';
+      return HourlyForecast(
+        label,
+        _number(temps[index]),
+        _number(wind[index]),
+        _number(rain[index]).round(),
+      );
     });
-
-    final rainVolume = ((rain['1h'] as num?) ?? rain['3h'] ?? 0).toDouble();
-
-    return (maxPop * 100 + (rainVolume > 0 ? 15 : 0)).clamp(0, 100).round();
   }
 
-  String _formatEpoch(num? epoch) {
-    if (epoch == null) return '--:--';
-
-    final date = DateTime.fromMillisecondsSinceEpoch(
-      epoch.toInt() * 1000,
-    ).toLocal();
-
-    return '${date.hour.toString().padLeft(2, '0')}:'
-        '${date.minute.toString().padLeft(2, '0')}';
+  int _rainFromPrecipitation(Map<String, dynamic> current) {
+    final precipitation = _number(current['precipitation']);
+    if (precipitation <= 0) return 0;
+    if (precipitation < 0.5) return 35;
+    if (precipitation < 2) return 65;
+    return 90;
   }
 
-  String _directionFromDegrees(double? degrees) {
-    if (degrees == null) return 'N/D';
+  String _timeFromDaily(dynamic value) {
+    final list = value as List<dynamic>? ?? [];
+    if (list.isEmpty) return '--:--';
 
+    final text = list.first.toString();
+    return text.length >= 16 ? text.substring(11, 16) : '--:--';
+  }
+
+  double _number(dynamic value) {
+    return value is num ? value.toDouble() : 0;
+  }
+
+  String _directionFromDegrees(double degrees) {
     const labels = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
     return labels[((degrees + 22.5) ~/ 45) % 8];
   }

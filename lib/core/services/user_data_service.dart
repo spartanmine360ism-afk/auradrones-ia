@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../constants/drone_constants.dart';
 import '../models/auth_user.dart';
 import '../models/battery.dart';
 import '../models/drone.dart';
@@ -115,15 +116,32 @@ class FirestoreUserDataService implements UserDataService {
       return DevUserDataService.instance.watchDrones(userId);
     }
     if (FirebaseBootstrap.failed) return Stream.error(_firebaseFailure);
-    return _users
-        .doc(userId)
-        .collection('drones')
-        .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => Drone.fromMap(doc.id, doc.data()))
-              .toList(),
-        );
+    return _users.doc(userId).collection('drones').snapshots().asyncMap((
+      snapshot,
+    ) async {
+      final drones = <Drone>[];
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final drone = Drone.fromMap(doc.id, data);
+        drones.add(drone);
+
+        final savedType = data['type'] as String?;
+        final savedStatus = data['status'] as String?;
+        final rawType = savedType ?? data['tipo'] as String?;
+        final rawStatus = savedStatus ?? data['estado'] as String?;
+        final normalizedType = DroneConstants.normalizeDroneType(rawType);
+        final normalizedStatus = DroneConstants.normalizeDroneStatus(rawStatus);
+
+        if (savedType != normalizedType || savedStatus != normalizedStatus) {
+          await doc.reference.set({
+            'type': normalizedType,
+            'status': normalizedStatus,
+            'updatedAt': DateTime.now().toIso8601String(),
+          }, SetOptions(merge: true));
+        }
+      }
+      return drones;
+    });
   }
 
   @override
@@ -136,7 +154,14 @@ class FirestoreUserDataService implements UserDataService {
         ? _users.doc(userId).collection('drones').doc()
         : _users.doc(userId).collection('drones').doc(drone.id);
     await ref.set(
-      drone.copyWith(id: ref.id, updatedAt: DateTime.now()).toMap(),
+      drone
+          .copyWith(
+            id: ref.id,
+            type: DroneConstants.normalizeDroneType(drone.type),
+            status: DroneConstants.normalizeDroneStatus(drone.status),
+            updatedAt: DateTime.now(),
+          )
+          .toMap(),
       SetOptions(merge: true),
     );
   }
@@ -311,7 +336,13 @@ class DevUserDataService implements UserDataService {
         ? DateTime.now().microsecondsSinceEpoch.toString()
         : drone.id;
     _drones.removeWhere((item) => item.id == id);
-    _drones.add(drone.copyWith(id: id));
+    _drones.add(
+      drone.copyWith(
+        id: id,
+        type: DroneConstants.normalizeDroneType(drone.type),
+        status: DroneConstants.normalizeDroneStatus(drone.status),
+      ),
+    );
   }
 
   @override

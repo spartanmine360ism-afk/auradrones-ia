@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/constants/drone_constants.dart';
 import '../../core/models/drone.dart';
 import '../../core/services/providers.dart';
 import '../../core/widgets/aura_background.dart';
@@ -104,8 +105,10 @@ class DronesScreen extends ConsumerWidget {
     final hours = TextEditingController(text: '${drone?.flightHours ?? 0}');
     final flights = TextEditingController(text: '${drone?.flightsCount ?? 0}');
     final notes = TextEditingController(text: drone?.notes ?? '');
-    String type = drone?.type ?? 'Ligero';
-    String status = drone?.status ?? 'Listo';
+    final droneTypes = DroneConstants.unique(DroneConstants.droneTypes);
+    final droneStatuses = DroneConstants.unique(DroneConstants.droneStatuses);
+    String type = DroneConstants.safeDroneTypeSelection(drone?.type);
+    String status = DroneConstants.safeDroneStatusSelection(drone?.status);
 
     await showModalBottomSheet<void>(
       context: context,
@@ -156,18 +159,26 @@ class DronesScreen extends ConsumerWidget {
               ),
               DropdownButtonFormField(
                 initialValue: type,
-                items: const ['Ligero', 'Mediano', 'FPV', 'Otro']
+                items: droneTypes
                     .map((v) => DropdownMenuItem(value: v, child: Text(v)))
                     .toList(),
-                onChanged: (v) => type = v!,
+                onChanged: (v) {
+                  if (v != null) {
+                    type = DroneConstants.safeDroneTypeSelection(v);
+                  }
+                },
                 decoration: const InputDecoration(labelText: 'Tipo'),
               ),
               DropdownButtonFormField(
                 initialValue: status,
-                items: const ['Listo', 'Revisar', 'Mantenimiento']
+                items: droneStatuses
                     .map((v) => DropdownMenuItem(value: v, child: Text(v)))
                     .toList(),
-                onChanged: (v) => status = v!,
+                onChanged: (v) {
+                  if (v != null) {
+                    status = DroneConstants.safeDroneStatusSelection(v);
+                  }
+                },
                 decoration: const InputDecoration(labelText: 'Estado'),
               ),
               TextField(
@@ -189,10 +200,10 @@ class DronesScreen extends ConsumerWidget {
                           model: model.text.trim(),
                           serialNumber: serial.text.trim(),
                           weightGrams: int.tryParse(weight.text) ?? 0,
-                          type: type,
+                          type: DroneConstants.normalizeDroneType(type),
                           flightHours: double.tryParse(hours.text) ?? 0,
                           flightsCount: int.tryParse(flights.text) ?? 0,
-                          status: status,
+                          status: DroneConstants.normalizeDroneStatus(status),
                           nextMaintenance: drone?.nextMaintenance ?? '',
                           purchaseDate: drone?.purchaseDate,
                           notes: notes.text.trim(),

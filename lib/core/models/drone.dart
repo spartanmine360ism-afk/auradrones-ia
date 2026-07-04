@@ -1,3 +1,5 @@
+import '../constants/drone_constants.dart';
+
 class Drone {
   const Drone({
     required this.id,
@@ -74,11 +76,11 @@ class Drone {
       'model': model,
       'serialNumber': serialNumber,
       'weightGrams': weightGrams,
-      'type': type,
+      'type': DroneConstants.normalizeDroneType(type),
       'purchaseDate': purchaseDate?.toIso8601String(),
       'totalFlightHours': flightHours,
       'flightsCount': flightsCount,
-      'status': status,
+      'status': DroneConstants.normalizeDroneStatus(status),
       'nextMaintenance': nextMaintenance,
       'notes': notes,
       'photoUrl': photoUrl,
@@ -96,7 +98,9 @@ class Drone {
           map['serialNumber'] as String? ?? map['numeroSerie'] as String? ?? '',
       weightGrams: ((map['weightGrams'] as num?) ?? (map['peso'] as num?) ?? 0)
           .round(),
-      type: map['type'] as String? ?? map['tipo'] as String? ?? 'Otro',
+      type: DroneConstants.normalizeDroneType(
+        map['type'] as String? ?? map['tipo'] as String?,
+      ),
       purchaseDate: DateTime.tryParse(
         map['purchaseDate'] as String? ?? map['fechaCompra'] as String? ?? '',
       ),
@@ -111,7 +115,9 @@ class Drone {
                   (map['vuelosRealizados'] as num?) ??
                   0)
               .round(),
-      status: map['status'] as String? ?? map['estado'] as String? ?? 'Listo',
+      status: DroneConstants.normalizeDroneStatus(
+        map['status'] as String? ?? map['estado'] as String?,
+      ),
       nextMaintenance:
           map['nextMaintenance'] as String? ??
           map['mantenimientoProximo'] as String? ??

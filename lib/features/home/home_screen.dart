@@ -91,11 +91,17 @@ class HomeScreen extends ConsumerWidget {
                       )
                     : _CompactMetricCard(
                         icon: Icons.satellite_alt_outlined,
-                        title: 'KP',
-                        value: value.value.toStringAsFixed(1),
-                        details: [value.risk, value.recommendation],
+                        title: 'KP Aura',
+                        value: value.recommended.toStringAsFixed(1),
+                        details: [
+                          'Prom ${value.average.toStringAsFixed(1)}',
+                          'Confianza ${value.confidence}',
+                          value.dataOrigins.isEmpty
+                              ? value.risk
+                              : value.dataOrigins.join(', '),
+                        ],
                       ),
-                loading: () => const _LoadingCard(label: 'Consultando KP NOAA'),
+                loading: () => const _LoadingCard(label: 'Consultando KP Aura'),
                 error: (_, _) => const _CompactMetricCard(
                   icon: Icons.satellite_alt_outlined,
                   title: 'KP',
