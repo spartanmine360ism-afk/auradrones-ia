@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../firebase_options.dart';
+import '../constants/app_constants.dart';
 
 class FirebaseBootstrap {
   const FirebaseBootstrap._();
@@ -14,6 +15,8 @@ class FirebaseBootstrap {
   static bool get failed =>
       configured && !initialized && initializationError != null;
   static String? get failureMessage => initializationError?.toString();
+  static String get localModeMessage =>
+      'Modo local: faltan ${AppConstants.missingFirebaseConfigKeys.join(', ')}.';
 
   static Future<void> initialize() async {
     if (!configured) return;

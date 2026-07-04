@@ -108,10 +108,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     if (FirebaseBootstrap.localMode) ...[
                       const SizedBox(height: 10),
-                      const _ModeBanner(
-                        text:
-                            'Modo local: Firebase no esta configurado en esta build.',
-                      ),
+                      _ModeBanner(text: FirebaseBootstrap.localModeMessage),
                     ] else if (FirebaseBootstrap.failed) ...[
                       const SizedBox(height: 10),
                       _ModeBanner(

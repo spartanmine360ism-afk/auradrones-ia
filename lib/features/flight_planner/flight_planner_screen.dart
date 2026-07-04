@@ -113,16 +113,31 @@ class _FlightPlannerScreenState extends ConsumerState<FlightPlannerScreen> {
       setState(() => _aiShotlist = answer);
     } catch (error) {
       if (!mounted) return;
-      setState(() => _aiShotlistError = '$error');
+      setState(() {
+        _aiShotlistError =
+            'Aura IA no pudo generar la lista. Modo local activado.';
+        _aiShotlist = _localShotlist();
+      });
     } finally {
       if (mounted) setState(() => _generatingShotlist = false);
     }
   }
 
+  String _localShotlist() {
+    return 'Shotlist local:\n'
+        '- Reveal lento desde baja altura, confirma zona libre.\n'
+        '- Orbit amplio del sujeto con radio conservador.\n'
+        '- Plano cenital corto para contexto.\n'
+        '- Dolly out de cierre manteniendo bateria de regreso.';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final plan = ref.watch(flightPlanProvider);
     final weather = ref.watch(weatherProvider);
+    final location = ref.watch(locationProvider);
+    final drone = ref.watch(activeDroneProvider);
+    final battery = ref.watch(activeBatteryProvider);
+    final profile = ref.watch(userProfileProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Planear vuelo'),
@@ -141,133 +156,144 @@ class _FlightPlannerScreenState extends ConsumerState<FlightPlannerScreen> {
       ),
       body: AuraBackground(
         child: SafeArea(
-          child: plan.when(
-            data: (p) => ListView(
-              padding: const EdgeInsets.all(18),
-              children: [
-                AuraGlassCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Checklist previa',
-                        style: Theme.of(context).textTheme.headlineMedium,
-                      ),
-                      if (!_loaded) ...[
-                        const SizedBox(height: 8),
-                        const LinearProgressIndicator(minHeight: 2),
-                      ],
-                      const SizedBox(height: 6),
-                      for (final item in _checklistItems)
-                        CheckboxListTile(
-                          value: _checked[item] ?? false,
-                          onChanged: (value) =>
-                              _setChecked(item, value ?? false),
-                          title: Text(item),
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          onPressed: _resetChecklist,
-                          icon: const Icon(Icons.restart_alt),
-                          label: const Text('Reiniciar checklist'),
-                        ),
+          child: ListView(
+            padding: const EdgeInsets.all(18),
+            children: [
+              AuraGlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Checklist previa',
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
+                    if (!_loaded) ...[
+                      const SizedBox(height: 8),
+                      const Row(
+                        children: [
+                          SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          SizedBox(width: 10),
+                          Text('Cargando checklist'),
+                        ],
                       ),
                     ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                weather.when(
-                  data: (value) => AuraGlassCard(
-                    child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.wb_twilight_outlined),
-                      title: const Text('Hora dorada'),
-                      subtitle: Text(
-                        'Manana ${value.sunrise} - ${_addMinutes(value.sunrise, 60)} | Tarde ${_addMinutes(value.sunset, -60)} - ${value.sunset}',
+                    const SizedBox(height: 6),
+                    for (final item in _checklistItems)
+                      CheckboxListTile(
+                        value: _checked[item] ?? false,
+                        onChanged: (value) => _setChecked(item, value ?? false),
+                        title: Text(item),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: _resetChecklist,
+                        icon: const Icon(Icons.restart_alt),
+                        label: const Text('Reiniciar checklist'),
                       ),
                     ),
-                  ),
-                  loading: () => const SizedBox.shrink(),
-                  error: (error, _) => AuraGlassCard(child: Text('$error')),
+                  ],
                 ),
-                const SizedBox(height: 14),
-                AuraGlassCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        p.name,
-                        style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 14),
+              AuraGlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Datos reales del vuelo',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    location.when(
+                      data: (value) => Text(
+                        'Ubicacion: ${value.city} (${value.coordinates})',
                       ),
-                      const SizedBox(height: 8),
-                      Text('${p.location} - ${p.time} - ${p.type}'),
-                      const SizedBox(height: 8),
-                      Text('${p.drone} - ${p.estimatedMinutes} min estimados'),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'Shotlist sugerida',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 10),
-                AuraGlassCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      FilledButton.icon(
-                        onPressed: _generatingShotlist
-                            ? null
-                            : _generateShotlist,
-                        icon: const Icon(Icons.auto_awesome),
-                        label: Text(
-                          _generatingShotlist
-                              ? 'Generando...'
-                              : 'Generar shotlist con IA',
-                        ),
+                      loading: () => const Text('Obteniendo ubicacion actual'),
+                      error: (error, _) =>
+                          Text('Ubicacion no disponible: $error'),
+                    ),
+                    drone.when(
+                      data: (value) =>
+                          Text('Dron activo: ${value.brand} ${value.model}'),
+                      loading: () => const Text('Leyendo dron activo'),
+                      error: (error, _) =>
+                          Text('Dron activo no disponible: $error'),
+                    ),
+                    battery.when(
+                      data: (value) => Text(
+                        'Bateria activa: ${value.name}, ${value.level}% disponible',
                       ),
-                      if (_aiShotlistError != null) ...[
-                        const SizedBox(height: 10),
-                        Text(_aiShotlistError!),
-                      ],
-                      if (_aiShotlist != null) ...[
-                        const SizedBox(height: 10),
-                        Text(_aiShotlist!),
-                      ],
-                    ],
-                  ),
+                      loading: () => const Text('Leyendo bateria activa'),
+                      error: (error, _) =>
+                          Text('Bateria activa no disponible: $error'),
+                    ),
+                    profile.when(
+                      data: (value) => Text(
+                        'Objetivo: ${value?.mainGoal ?? 'Sin objetivo'}',
+                      ),
+                      loading: () => const Text('Leyendo objetivo del usuario'),
+                      error: (error, _) =>
+                          Text('Objetivo no disponible: $error'),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                for (final shot in p.shots) ...[
-                  AuraGlassCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          shot.name,
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 6),
-                        Text(shot.description),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Dificultad ${shot.difficulty} - Riesgo ${shot.risk}',
-                        ),
-                        Text(shot.camera),
-                        const SizedBox(height: 6),
-                        Text(shot.tip),
-                      ],
+              ),
+              const SizedBox(height: 14),
+              weather.when(
+                data: (value) => AuraGlassCard(
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.wb_twilight_outlined),
+                    title: const Text('Hora dorada en tu ubicación'),
+                    subtitle: Text(
+                      'Amanecer: ${value.sunrise}\n'
+                      'Atardecer: ${value.sunset}\n'
+                      'Golden hour mañana: ${value.sunrise} - ${_addMinutes(value.sunrise, 60)}\n'
+                      'Golden hour tarde: ${_addMinutes(value.sunset, -60)} - ${value.sunset}',
                     ),
                   ),
-                  const SizedBox(height: 12),
-                ],
-              ],
-            ),
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) => Center(child: Text('Error: $error')),
+                ),
+                loading: () => const AuraGlassCard(
+                  child: Text('Calculando hora dorada con tu ubicacion'),
+                ),
+                error: (error, _) => AuraGlassCard(child: Text('$error')),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Shotlist IA',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 10),
+              AuraGlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: _generatingShotlist ? null : _generateShotlist,
+                      icon: const Icon(Icons.auto_awesome),
+                      label: Text(
+                        _generatingShotlist
+                            ? 'Generando...'
+                            : 'Generar shotlist con IA',
+                      ),
+                    ),
+                    if (_aiShotlistError != null) ...[
+                      const SizedBox(height: 10),
+                      Text(_aiShotlistError!),
+                    ],
+                    if (_aiShotlist != null) ...[
+                      const SizedBox(height: 10),
+                      Text(_aiShotlist!),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),

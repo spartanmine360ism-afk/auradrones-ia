@@ -21,6 +21,7 @@ class NoaaKpIndexService implements KpIndexService {
   NoaaKpIndexService({http.Client? client}) : _client = client ?? http.Client();
 
   final http.Client _client;
+  static KpIndex? _lastKnown;
 
   @override
   Future<KpIndex> current() async {
@@ -37,28 +38,57 @@ class NoaaKpIndexService implements KpIndexService {
           'NOAA SWPC respondio ${response.statusCode}: ${response.body}',
         );
       }
-      final rows = jsonDecode(response.body) as List<dynamic>;
-      final dataRows = rows
-          .whereType<List<dynamic>>()
-          .where(
-            (row) => row.length >= 2 && double.tryParse('${row[1]}') != null,
-          )
-          .toList();
-      if (dataRows.isEmpty) {
+      final decoded = jsonDecode(response.body);
+      if (decoded is! List<dynamic>) {
+        throw const KpIndexServiceException(
+          'NOAA SWPC devolvio formato inesperado.',
+        );
+      }
+      final latest = decoded.whereType<List<dynamic>>().lastWhere(
+        _isValidKpRow,
+        orElse: () => const [],
+      );
+      if (latest.isEmpty) {
         throw const KpIndexServiceException('NOAA SWPC no devolvio datos KP.');
       }
-      final latest = dataRows.last;
       final value = double.parse('${latest[1]}');
-      return KpIndex(
+      final kp = KpIndex(
         value: value,
         risk: _risk(value),
         recommendation: _recommendation(value),
       );
+      _lastKnown = kp;
+      return kp;
     } on KpIndexServiceException {
-      rethrow;
+      return _fallback();
     } catch (error) {
-      throw KpIndexServiceException('No se pudo consultar NOAA SWPC: $error');
+      return _fallback();
     }
+  }
+
+  bool _isValidKpRow(List<dynamic> row) {
+    if (row.length < 2) return false;
+    final time = DateTime.tryParse('${row[0]}');
+    final kp = double.tryParse('${row[1]}');
+    return time != null && kp != null;
+  }
+
+  KpIndex _fallback() {
+    final lastKnown = _lastKnown;
+    if (lastKnown != null) {
+      return KpIndex(
+        value: lastKnown.value,
+        risk: 'KP no disponible temporalmente',
+        recommendation:
+            'Usando ultimo KP conocido (${lastKnown.value.toStringAsFixed(1)}). Reintenta antes de despegar.',
+      );
+    }
+    return const KpIndex(
+      value: 0,
+      risk: 'KP no disponible temporalmente',
+      recommendation:
+          'No se pudo leer NOAA SWPC. Reintenta antes de despegar y vuela conservador.',
+    );
   }
 
   String _risk(double value) {

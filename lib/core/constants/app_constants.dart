@@ -29,4 +29,13 @@ class AppConstants {
       firebaseAppId.isNotEmpty &&
       firebaseProjectId.isNotEmpty &&
       firebaseMessagingSenderId.isNotEmpty;
+
+  static List<String> get missingFirebaseConfigKeys {
+    return [
+      if (firebaseApiKey.isEmpty) 'FIREBASE_API_KEY',
+      if (firebaseAppId.isEmpty) 'FIREBASE_APP_ID',
+      if (firebaseProjectId.isEmpty) 'FIREBASE_PROJECT_ID',
+      if (firebaseMessagingSenderId.isEmpty) 'FIREBASE_MESSAGING_SENDER_ID',
+    ];
+  }
 }

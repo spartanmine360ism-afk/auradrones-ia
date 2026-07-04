@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/ai_chat_message.dart';
+import '../../core/services/openai_service.dart';
 import '../../core/services/providers.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/widgets/aura_background.dart';
@@ -66,7 +67,8 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
             battery: battery,
             pilotLevel: profile?.pilotLevel ?? 'Dato no disponible',
             totalFlightHours: profile?.totalFlightHours ?? 0,
-          );
+          )
+          .timeout(const Duration(seconds: 18));
       if (!mounted) return;
       setState(() {
         _messages.add(AiChatMessage(role: 'assistant', text: answer));
@@ -75,11 +77,14 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
       if (!mounted) return;
       setState(() {
         _lastFailedPrompt = text;
+        final message = error is OpenAIServiceException
+            ? error.message
+            : 'Aura IA no pudo responder ahora. Modo local activado.';
         _messages.add(
           AiChatMessage(
             role: 'assistant',
-            text: 'Error real de IA\n$error',
-            isError: true,
+            text: '$message\n\n${_localAnswer(text)}',
+            isError: false,
             canRetry: true,
           ),
         );
@@ -91,6 +96,20 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
         });
       }
     }
+  }
+
+  String _localAnswer(String text) {
+    final lower = text.toLowerCase();
+    if (lower.contains('shot') || lower.contains('toma')) {
+      return 'Shotlist local:\n- Reveal lento y bajo.\n- Orbit amplio con distancia segura.\n- Plano cenital corto.\n- Dolly out para cierre.';
+    }
+    if (lower.contains('volar') || lower.contains('riesgo')) {
+      return 'Modo local: revisa viento, rachas, KP, bateria y zona. Si algo no se ve claro, vuela cerca y con margen amplio de regreso.';
+    }
+    if (lower.contains('nd') || lower.contains('filtro')) {
+      return 'Modo local: usa ISO 100. Prueba ND16 con sol fuerte, ND8 cerca de atardecer y ajusta para mantener motion blur natural.';
+    }
+    return 'Modo local: puedo ayudarte con clima, riesgos, filtros ND o una lista de tomas usando reglas basicas.';
   }
 
   void _clearChat() {
@@ -268,7 +287,7 @@ class _TypingBubble extends StatelessWidget {
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
             SizedBox(width: 10),
-            Text('Aura IA responde...'),
+            Text('Procesando respuesta, maximo 18 s...'),
           ],
         ),
       ),

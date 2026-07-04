@@ -83,8 +83,7 @@ class AuraShell extends ConsumerWidget {
       '/weather' || '/score' => 1,
       '/ai' => 2,
       '/planner' || '/drones' || '/batteries' => 3,
-      '/academy' => 4,
-      _ => 5,
+      _ => 4,
     };
 
     return Scaffold(
@@ -97,7 +96,6 @@ class AuraShell extends ConsumerWidget {
             1 => '/weather',
             2 => '/ai',
             3 => '/planner',
-            4 => '/academy',
             _ => '/profile',
           };
           context.go(route);
@@ -122,11 +120,6 @@ class AuraShell extends ConsumerWidget {
             icon: Icon(Icons.flight_takeoff_outlined),
             selectedIcon: Icon(Icons.flight_takeoff),
             label: 'Vuelo',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.school_outlined),
-            selectedIcon: Icon(Icons.school),
-            label: 'Academia',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),

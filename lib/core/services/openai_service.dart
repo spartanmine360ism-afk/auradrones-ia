@@ -113,8 +113,14 @@ Nivel del piloto: $pilotLevel. Horas totales de vuelo: ${totalFlightHours.toStri
           .timeout(const Duration(seconds: 18));
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
+        final body = response.body.toLowerCase();
+        if (response.statusCode == 429 && body.contains('insufficient_quota')) {
+          throw const OpenAIServiceException(
+            'Aura IA no está disponible por cuota agotada. Modo local activado.',
+          );
+        }
         throw OpenAIServiceException(
-          'OpenAI ${response.statusCode}: ${response.body}',
+          'Aura IA no pudo responder ahora (OpenAI ${response.statusCode}). Modo local activado.',
         );
       }
 
@@ -127,7 +133,9 @@ Nivel del piloto: $pilotLevel. Horas totales de vuelo: ${totalFlightHours.toStri
     } on OpenAIServiceException {
       rethrow;
     } catch (error) {
-      throw OpenAIServiceException('No se pudo conectar con OpenAI: $error');
+      throw const OpenAIServiceException(
+        'Aura IA no pudo conectarse. Modo local activado.',
+      );
     }
   }
 

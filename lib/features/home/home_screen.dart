@@ -37,7 +37,7 @@ class HomeScreen extends ConsumerWidget {
                   'Hola, ${value?.name.isNotEmpty == true ? value!.name : 'Piloto'}',
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
-                loading: () => const LinearProgressIndicator(),
+                loading: () => const _LoadingCard(label: 'Cargando perfil'),
                 error: (error, _) => Text('Hola, Piloto\n$error'),
               ),
               const SizedBox(height: 10),
@@ -46,7 +46,8 @@ class HomeScreen extends ConsumerWidget {
                   score: value,
                   onTap: () => context.go('/score'),
                 ),
-                loading: () => const LinearProgressIndicator(),
+                loading: () =>
+                    const _LoadingCard(label: 'Calculando Fly Score'),
                 error: (error, _) => AuraGlassCard(
                   padding: const EdgeInsets.all(12),
                   child: Text('Fly Score pendiente\n$error'),
@@ -63,7 +64,8 @@ class HomeScreen extends ConsumerWidget {
                     'Visibilidad ${w.visibilityKm.toStringAsFixed(1)} km',
                   ],
                 ),
-                loading: () => const LinearProgressIndicator(),
+                loading: () =>
+                    const _LoadingCard(label: 'Consultando clima real'),
                 error: (error, _) => AuraGlassCard(
                   padding: const EdgeInsets.all(12),
                   child: Text('Clima no disponible\n$error'),
@@ -71,13 +73,29 @@ class HomeScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 10),
               kp.when(
-                data: (value) => _CompactMetricCard(
-                  icon: Icons.satellite_alt_outlined,
-                  title: 'KP',
-                  value: value.value.toStringAsFixed(1),
-                  details: [value.risk],
-                ),
-                loading: () => const SizedBox.shrink(),
+                data: (value) => value.risk == 'KP no disponible temporalmente'
+                    ? AuraGlassCard(
+                        padding: const EdgeInsets.all(12),
+                        child: ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.satellite_alt_outlined),
+                          title: const Text('KP no disponible temporalmente'),
+                          subtitle: Text(value.recommendation),
+                          trailing: IconButton(
+                            tooltip: 'Reintentar KP',
+                            onPressed: () => ref.invalidate(kpProvider),
+                            icon: const Icon(Icons.refresh),
+                          ),
+                        ),
+                      )
+                    : _CompactMetricCard(
+                        icon: Icons.satellite_alt_outlined,
+                        title: 'KP',
+                        value: value.value.toStringAsFixed(1),
+                        details: [value.risk, value.recommendation],
+                      ),
+                loading: () => const _LoadingCard(label: 'Consultando KP NOAA'),
                 error: (_, _) => const _CompactMetricCard(
                   icon: Icons.satellite_alt_outlined,
                   title: 'KP',
@@ -176,6 +194,29 @@ class HomeScreen extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _LoadingCard extends StatelessWidget {
+  const _LoadingCard({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return AuraGlassCard(
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: [
+          const SizedBox.square(
+            dimension: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 10),
+          Text(label),
+        ],
       ),
     );
   }

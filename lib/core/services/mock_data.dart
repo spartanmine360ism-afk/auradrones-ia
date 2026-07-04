@@ -107,11 +107,11 @@ class MockData {
   ];
 
   static const plan = FlightPlan(
-    name: 'Golden hour Reforma',
-    location: 'Paseo de la Reforma',
-    time: '18:20',
-    type: 'Contenido para redes',
-    drone: 'DJI Mini 4 Pro',
+    name: 'Plan local de vuelo',
+    location: 'Ubicacion actual',
+    time: 'Hora local',
+    type: 'Objetivo del usuario',
+    drone: 'Dron activo',
     estimatedMinutes: 24,
     shots: [
       ShotIdea(
