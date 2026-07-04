@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Aura Drones IA Android",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "87f2eff9",
+      "toolArgs": [
+        "--dart-define=GEMINI_API_KEY=TU_API_DE_GEMINI",
+        "--dart-define=WEATHER_API_KEY=TU_API_DE_OPENWEATHER"
+      ]
+    }
+  ]
+}

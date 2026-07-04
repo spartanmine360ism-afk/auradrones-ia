@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "787315355035",
+    "project_id": "aura-drones-ia",
+    "storage_bucket": "aura-drones-ia.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:787315355035:android:0ece3902f4bd91bd72853e",
+        "android_client_info": {
+          "package_name": "com.aurapilot.aura_drones_ia"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBzZkaTY-wTEwlLhX5tjxSe_QYabdaqajU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

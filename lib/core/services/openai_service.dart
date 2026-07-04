@@ -38,8 +38,8 @@ class OpenAIServiceException implements Exception {
 
 class OpenAIChatService implements OpenAIService {
   OpenAIChatService({http.Client? client, String? apiKey})
-    : _client = client ?? http.Client(),
-      _apiKey = apiKey ?? AppConstants.openAiApiKey;
+      : _client = client ?? http.Client(),
+        _apiKey = apiKey ?? AppConstants.geminiApiKey;
 
   final http.Client _client;
   final String _apiKey;
@@ -74,83 +74,104 @@ class OpenAIChatService implements OpenAIService {
       );
     }
 
-    final context =
-        '''
+    final context = '''
+Eres Aura IA, un copiloto inteligente para pilotos de drones.
+
+Responde en español, claro y breve.
+No repitas respuestas anteriores.
+No inventes datos.
+Nunca recomiendes volar si las condiciones son peligrosas o ilegales.
+Limita la respuesta a 4-6 líneas cortas para móvil.
+
 Mensaje exacto del usuario: $message
-Ubicación: ${location.city} (${location.coordinates}), precisión ${location.accuracyMeters.round()} m.
-Clima: ${weather.temperatureC.round()} C, viento ${weather.windKmh.round()} km/h, rachas ${weather.gustKmh.round()} km/h, lluvia ${weather.rainChance}%, visibilidad ${weather.visibilityKm} km, nubes ${weather.cloudCover}%.
-KP: ${kp.value} (${kp.risk}).
-Fly Score: ${flyScore.value}, estado ${flyScore.status}. Recomendación: ${flyScore.recommendation}.
-Dron activo: ${drone.brand} ${drone.model}, tipo ${drone.type}, ${drone.weightGrams} g.
-Drones del usuario: ${drones.map((item) => '${item.brand} ${item.model}').join(', ')}.
-Batería activa: ${battery.name}, nivel ${battery.level}%, salud ${battery.health}%, ciclos ${battery.cycles}.
-Nivel del piloto: $pilotLevel. Horas totales de vuelo: ${totalFlightHours.toStringAsFixed(1)}.
+
+Datos reales:
+- Ubicación: ${location.city} (${location.coordinates}), precisión ${location.accuracyMeters.round()} m.
+- Clima: ${weather.temperatureC.round()} C, viento ${weather.windKmh.round()} km/h, rachas ${weather.gustKmh.round()} km/h, lluvia ${weather.rainChance}%, visibilidad ${weather.visibilityKm} km, nubes ${weather.cloudCover}%.
+- KP: ${kp.value} (${kp.risk}).
+- Fly Score: ${flyScore.value}, estado ${flyScore.status}. Recomendación: ${flyScore.recommendation}.
+- Dron activo: ${drone.brand} ${drone.model}, tipo ${drone.type}, ${drone.weightGrams} g.
+- Drones del usuario: ${drones.map((item) => '${item.brand} ${item.model}').join(', ')}.
+- Batería activa: ${battery.name}, nivel ${battery.level}%, salud ${battery.health}%, ciclos ${battery.cycles}.
+- Nivel del piloto: $pilotLevel.
+- Horas totales de vuelo: ${totalFlightHours.toStringAsFixed(1)}.
+
+Reglas:
+- Si pregunta "hola", saluda corto.
+- Si pregunta si puede volar hoy, analiza clima, KP, Fly Score y batería.
+- Si pregunta qué ND usar, recomienda filtro según luz/hora.
+- Si pide tomas o shotlist, crea una lista de tomas.
+- Si pregunta riesgos, explica riesgos principales.
 ''';
 
     final conversation = history
         .where((item) => item.text.trim().isNotEmpty)
         .take(8)
-        .map((item) => '${item.isUser ? 'user' : 'assistant'}: ${item.text}')
+        .map((item) => '${item.isUser ? 'Usuario' : 'Aura IA'}: ${item.text}')
         .join('\n');
+
+    final prompt =
+        '$context\nHistorial reciente:\n$conversation\n\nResponde ahora al usuario: $message';
 
     try {
       final response = await _client
           .post(
-            Uri.https('api.openai.com', '/v1/responses'),
-            headers: {
-              'Authorization': 'Bearer $_apiKey',
-              'Content-Type': 'application/json',
-            },
+            Uri.https(
+              'generativelanguage.googleapis.com',
+              '/v1beta/models/${AppConstants.geminiModel}:generateContent',
+              {'key': _apiKey},
+            ),
+            headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
-              'model': AppConstants.openAiModel,
-              'instructions':
-                  'Eres Aura IA, un copiloto inteligente para pilotos de drones. Responde específicamente al mensaje exacto del usuario, sin repetir respuestas anteriores. Usa contexto real de clima, ubicación, KP, Fly Score, dron activo, batería y nivel del piloto. Limita la respuesta a 4-6 líneas cortas para móvil. Si pregunta "hola", saluda corto. Si pregunta si puede volar hoy, analiza clima y Fly Score. Si pregunta qué ND usar, recomienda filtro según luz/hora. Si pide tomas, crea shotlist. Si pregunta riesgos, explica riesgos. Nunca recomiendes volar si las condiciones son peligrosas o ilegales.',
-              'input':
-                  '$context\nHistorial reciente:\n$conversation\n\nResponde ahora al usuario: $message',
-              'max_output_tokens': 260,
+              'contents': [
+                {
+                  'role': 'user',
+                  'parts': [
+                    {'text': prompt},
+                  ],
+                },
+              ],
+              'generationConfig': {
+                'maxOutputTokens': 260,
+                'temperature': 0.7,
+                'topP': 0.9,
+              },
             }),
           )
           .timeout(const Duration(seconds: 18));
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        final body = response.body.toLowerCase();
-        if (response.statusCode == 429 && body.contains('insufficient_quota')) {
-          throw const OpenAIServiceException(
-            'Aura IA no está disponible por cuota agotada. Modo local activado.',
-          );
-        }
         throw OpenAIServiceException(
-          'Aura IA no pudo responder ahora (OpenAI ${response.statusCode}). Modo local activado.',
+          'Aura IA no pudo responder ahora (Gemini ${response.statusCode}). Modo local activado.',
         );
       }
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
-      final answer = json['output_text'] as String? ?? _extractOutputText(json);
+      final answer = _extractGeminiText(json);
 
       return answer?.trim().isNotEmpty == true
           ? answer!.trim()
-          : 'No recibí una respuesta útil. Revisa tu conexión e intenta de nuevo.';
+          : 'No recibí una respuesta útil. Intenta de nuevo.';
     } on OpenAIServiceException {
       rethrow;
-    } catch (error) {
+    } catch (_) {
       throw const OpenAIServiceException(
         'Aura IA no pudo conectarse. Modo local activado.',
       );
     }
   }
 
-  String? _extractOutputText(Map<String, dynamic> json) {
-    final output = json['output'] as List<dynamic>? ?? [];
+  String? _extractGeminiText(Map<String, dynamic> json) {
+    final candidates = json['candidates'] as List<dynamic>? ?? [];
     final chunks = <String>[];
 
-    for (final item in output) {
-      final content =
-          (item as Map<String, dynamic>)['content'] as List<dynamic>? ?? [];
+    for (final candidate in candidates) {
+      final content = (candidate as Map<String, dynamic>)['content']
+          as Map<String, dynamic>?;
+      final parts = content?['parts'] as List<dynamic>? ?? [];
 
-      for (final contentItem in content) {
-        final contentMap = contentItem as Map<String, dynamic>;
-        final text = contentMap['text'] as String?;
-
+      for (final part in parts) {
+        final text = (part as Map<String, dynamic>)['text'] as String?;
         if (text != null && text.trim().isNotEmpty) {
           chunks.add(text.trim());
         }
